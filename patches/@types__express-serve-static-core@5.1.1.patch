@@ -1,0 +1,13 @@
+diff --git a/index.d.ts b/index.d.ts
+index 4f1fc7736269dbccb52af4414686db1bb0e5e8d2..96762084dfe7678b8cc6a757e3e82dfc59c5f61a 100644
+--- a/index.d.ts
++++ b/index.d.ts
+@@ -42,7 +42,7 @@ export interface Dictionary<T> {
+ }
+ 
+ export interface ParamsDictionary {
+-    [key: string]: string | string[];
++    [key: string]: string;
+     [key: number]: string;
+ }
+ export interface ParamsFlatDictionary {

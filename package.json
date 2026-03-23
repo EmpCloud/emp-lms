@@ -1,0 +1,29 @@
+{
+  "name": "emp-lms",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EmpCloud Learning Management System — Courses, learning paths, SCORM, certifications, compliance training, AI recommendations",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"pnpm --filter @emp-lms/server dev\" \"pnpm --filter @emp-lms/client dev\"",
+    "dev:server": "pnpm --filter @emp-lms/server dev",
+    "dev:client": "pnpm --filter @emp-lms/client dev",
+    "build": "pnpm --filter @emp-lms/shared build && pnpm --filter @emp-lms/server build && pnpm --filter @emp-lms/client build",
+    "build:server": "pnpm --filter @emp-lms/shared build && pnpm --filter @emp-lms/server build",
+    "test": "pnpm --filter @emp-lms/server test",
+    "test:watch": "pnpm --filter @emp-lms/server test:watch",
+    "test:coverage": "pnpm --filter @emp-lms/server test:coverage",
+    "lint": "pnpm -r lint",
+    "db:migrate": "pnpm --filter @emp-lms/server db:migrate",
+    "db:seed": "pnpm --filter @emp-lms/server db:seed",
+    "db:rollback": "pnpm --filter @emp-lms/server db:rollback",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

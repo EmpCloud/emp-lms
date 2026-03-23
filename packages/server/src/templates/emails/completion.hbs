@@ -1,0 +1,48 @@
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+  <tr>
+    <td style="padding-bottom: 24px; text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 8px;">&#127942;</div>
+      <h1 style="margin: 0 0 8px; font-size: 22px; font-weight: 600; color: #202124;">Congratulations!</h1>
+      <p style="margin: 0; font-size: 15px; color: #5f6368; line-height: 1.5;">Hi {{name}}, you did it!</p>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding-bottom: 24px;">
+      <p style="margin: 0 0 16px; font-size: 15px; color: #3c4043; line-height: 1.6;">
+        You have successfully completed the following course. Great job on your learning achievement!
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #e8f5e9; border-radius: 8px; border-left: 4px solid #2e7d32;">
+        <tr>
+          <td style="padding: 16px 20px;">
+            <p style="margin: 0 0 4px; font-size: 12px; font-weight: 600; color: #2e7d32; text-transform: uppercase; letter-spacing: 0.5px;">Completed Course</p>
+            <p style="margin: 0 0 8px; font-size: 18px; font-weight: 600; color: #202124;">{{courseName}}</p>
+            {{#if score}}
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top: 8px;">
+              <tr>
+                <td style="padding-right: 8px;">
+                  <span style="font-size: 13px; color: #5f6368;">Your Score:</span>
+                </td>
+                <td>
+                  <span style="display: inline-block; padding: 4px 12px; background-color: #2e7d32; color: #ffffff; font-size: 14px; font-weight: 600; border-radius: 12px;">{{score}}%</span>
+                </td>
+              </tr>
+            </table>
+            {{/if}}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding-bottom: 24px; text-align: center;">
+      <a href="{{actionUrl}}" style="display: inline-block; padding: 12px 32px; background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; border-radius: 6px; letter-spacing: 0.3px;">View Certificate</a>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <p style="margin: 0; font-size: 13px; color: #9aa0a6; line-height: 1.5;">
+        Keep up the great work! Check out more courses available for you.
+      </p>
+    </td>
+  </tr>
+</table>

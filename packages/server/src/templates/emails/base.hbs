@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>EmpCloud LMS</title>
+  <style>
+    /* Reset */
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    body { margin: 0; padding: 0; width: 100% !important; height: 100% !important; background-color: #f4f7fa; }
+
+    /* Responsive */
+    @media only screen and (max-width: 620px) {
+      .email-container { width: 100% !important; max-width: 100% !important; }
+      .email-content { padding: 24px 16px !important; }
+      .email-header { padding: 20px 16px !important; }
+      .email-footer { padding: 16px !important; }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <!-- Wrapper -->
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f7fa;">
+    <tr>
+      <td align="center" style="padding: 24px 12px;">
+
+        <!-- Email Container -->
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" class="email-container" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td class="email-header" style="padding: 28px 40px; background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%); text-align: center;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="text-align: center;">
+                    <span style="font-size: 24px; font-weight: 700; color: #ffffff; letter-spacing: 0.5px;">EmpCloud LMS</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td class="email-content" style="padding: 36px 40px;">
+              {{{content}}}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td class="email-footer" style="padding: 24px 40px; background-color: #f8f9fa; border-top: 1px solid #e8eaed;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="text-align: center; padding-bottom: 12px;">
+                    <span style="font-size: 13px; color: #5f6368;">EmpCloud LMS &mdash; Learning Management System</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: center; padding-bottom: 8px;">
+                    <span style="font-size: 12px; color: #9aa0a6;">This is an automated message. Please do not reply directly to this email.</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="text-align: center;">
+                    <a href="{{unsubscribeUrl}}" style="font-size: 12px; color: #1a73e8; text-decoration: underline;">Manage notification preferences</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Email Container -->
+
+      </td>
+    </tr>
+  </table>
+  <!-- /Wrapper -->
+</body>
+</html>

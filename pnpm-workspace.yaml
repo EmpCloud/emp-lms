@@ -1,0 +1,4 @@
+packages:
+  - "packages/*"
+patchedDependencies:
+  '@types/express-serve-static-core@5.1.1': patches/@types__express-serve-static-core@5.1.1.patch
