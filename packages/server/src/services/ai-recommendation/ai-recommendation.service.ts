@@ -120,7 +120,7 @@ export async function getRecommendations(
     `SELECT c.*, cat.name AS category_name
      FROM courses c
      LEFT JOIN course_categories cat ON cat.id = c.category_id
-     WHERE c.organization_id = ? ${excludeClause}
+     WHERE c.org_id = ? ${excludeClause}
        AND c.status = 'published'
      ORDER BY c.enrollment_count DESC, c.avg_rating DESC`,
     params
@@ -292,7 +292,7 @@ export async function getSkillGapRecommendations(
       `SELECT c.*, cat.name AS category_name
        FROM courses c
        LEFT JOIN course_categories cat ON cat.id = c.category_id
-       WHERE c.organization_id = ?
+       WHERE c.org_id = ?
          AND c.status = 'published'
          AND c.id NOT IN (SELECT course_id FROM enrollments WHERE user_id = ? AND org_id = ?)
          ${excludeClause}
@@ -337,7 +337,7 @@ export async function getSkillGapRecommendations(
     `SELECT c.*, cat.name AS category_name
      FROM courses c
      LEFT JOIN course_categories cat ON cat.id = c.category_id
-     WHERE c.organization_id = ?
+     WHERE c.org_id = ?
        AND c.status = 'published'
        AND c.id NOT IN (SELECT course_id FROM enrollments WHERE user_id = ? AND org_id = ?)
        AND (${tagConditions || "1=0"})
@@ -383,7 +383,7 @@ export async function getTrendingCourses(
      FROM courses c
      LEFT JOIN course_categories cat ON cat.id = c.category_id
      LEFT JOIN enrollments e ON e.course_id = c.id AND e.enrolled_at >= ?
-     WHERE c.organization_id = ? AND c.status = 'published'
+     WHERE c.org_id = ? AND c.status = 'published'
      GROUP BY c.id
      ORDER BY recent_enrollments DESC, c.avg_rating DESC
      LIMIT ?`,
@@ -406,7 +406,7 @@ export async function getSimilarCourses(
 
   const course = await db.findOne<any>("courses", {
     id: courseId,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", courseId);
@@ -456,7 +456,7 @@ export async function getSimilarCourses(
     `SELECT c.*, cat.name AS category_name
      FROM courses c
      LEFT JOIN course_categories cat ON cat.id = c.category_id
-     WHERE c.organization_id = ?
+     WHERE c.org_id = ?
        AND c.id != ?
        AND c.status = 'published'
        ${whereExtra}

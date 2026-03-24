@@ -129,7 +129,7 @@ async function resolveAffectedUsers(
       }
       const deptIds = assignedToIds.map(Number);
       const users = await empDb("users")
-        .where({ organization_id: orgId, status: 1 })
+        .where({ org_id: orgId, status: 1 })
         .whereIn("department_id", deptIds)
         .select("id");
       return users.map((u: any) => u.id);
@@ -142,7 +142,7 @@ async function resolveAffectedUsers(
       }
       const roles = assignedToIds.map(String);
       const users = await empDb("users")
-        .where({ organization_id: orgId, status: 1 })
+        .where({ org_id: orgId, status: 1 })
         .whereIn("role", roles)
         .select("id");
       return users.map((u: any) => u.id);
@@ -512,7 +512,7 @@ export async function getComplianceDashboard(orgId: number) {
             SUM(CASE WHEN cr.status = 'completed' THEN 1 ELSE 0 END) as completed,
             SUM(CASE WHEN cr.status = 'overdue' THEN 1 ELSE 0 END) as overdue
      FROM compliance_records cr
-     LEFT JOIN (SELECT id, department_id FROM ${getEmpCloudDBName()}.users WHERE organization_id = ?) u
+     LEFT JOIN (SELECT id, department_id FROM ${getEmpCloudDBName()}.users WHERE org_id = ?) u
        ON u.id = cr.user_id
      WHERE cr.org_id = ?
      GROUP BY u.department_id`,

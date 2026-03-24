@@ -28,7 +28,7 @@ export async function getOverviewDashboard(orgId: number): Promise<any> {
     totalCertificatesResult,
   ] = await Promise.all([
     db.raw<any[]>(
-      `SELECT COUNT(*) AS total FROM courses WHERE organization_id = ? AND status != 'archived'`,
+      `SELECT COUNT(*) AS total FROM courses WHERE org_id = ? AND status != 'archived'`,
       [orgId]
     ),
     db.raw<any[]>(
@@ -90,7 +90,7 @@ export async function getCourseAnalytics(
 
   const course = await db.findOne<any>("courses", {
     id: courseId,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", courseId);
@@ -307,7 +307,7 @@ export async function getOrgAnalytics(
     db.raw<any[]>(
       `SELECT c.id, c.title, c.enrollment_count, c.completion_count, c.avg_rating
        FROM courses c
-       WHERE c.organization_id = ? AND c.status = 'published'
+       WHERE c.org_id = ? AND c.status = 'published'
        ORDER BY c.enrollment_count DESC
        LIMIT 10`,
       [orgId]
@@ -581,7 +581,7 @@ export async function getInstructorAnalytics(
     db.raw<any[]>(
       `SELECT c.id, c.title, c.enrollment_count, c.avg_rating
        FROM courses c
-       WHERE c.organization_id = ? AND c.instructor_id = ?
+       WHERE c.org_id = ? AND c.instructor_id = ?
        ORDER BY c.enrollment_count DESC`,
       [orgId, instructorId]
     ),
@@ -754,7 +754,7 @@ export async function exportAnalytics(
            c.enrollment_count, c.completion_count, c.avg_rating,
            c.duration_minutes, c.created_at, c.published_at
          FROM courses c
-         WHERE c.organization_id = ?
+         WHERE c.org_id = ?
          ORDER BY c.created_at DESC`,
         [orgId]
       );

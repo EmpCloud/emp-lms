@@ -36,7 +36,7 @@ export async function listCategories(orgId: number) {
     `SELECT cat.*, COUNT(c.id) AS course_count
      FROM course_categories cat
      LEFT JOIN courses c ON c.category_id = cat.id AND c.status != 'archived'
-     WHERE cat.organization_id = ?
+     WHERE cat.org_id = ?
      GROUP BY cat.id
      ORDER BY cat.sort_order ASC, cat.name ASC`,
     [orgId]
@@ -54,7 +54,7 @@ export async function getCategory(orgId: number, id: string) {
 
   const category = await db.findOne<any>("course_categories", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!category) {
     throw new NotFoundError("Category", id);
@@ -62,7 +62,7 @@ export async function getCategory(orgId: number, id: string) {
 
   const subcategories = await db.raw<any[]>(
     `SELECT * FROM course_categories
-     WHERE parent_id = ? AND organization_id = ?
+     WHERE parent_id = ? AND org_id = ?
      ORDER BY sort_order ASC, name ASC`,
     [id, orgId]
   );
@@ -91,7 +91,7 @@ export async function createCategory(
   if (data.parent_id) {
     const parent = await db.findOne<any>("course_categories", {
       id: data.parent_id,
-      organization_id: orgId,
+      org_id: orgId,
     });
     if (!parent) {
       throw new NotFoundError("Parent category", data.parent_id);
@@ -104,7 +104,7 @@ export async function createCategory(
   // Check slug uniqueness within org
   const existingSlug = await db.findOne<any>("course_categories", {
     slug,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (existingSlug) {
     throw new ConflictError(`A category with slug '${slug}' already exists`);
@@ -112,7 +112,7 @@ export async function createCategory(
 
   const category = await db.create<any>("course_categories", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
     name: data.name,
     slug,
     description: data.description || null,
@@ -137,7 +137,7 @@ export async function updateCategory(
 
   const category = await db.findOne<any>("course_categories", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!category) {
     throw new NotFoundError("Category", id);
@@ -150,7 +150,7 @@ export async function updateCategory(
     const newSlug = data.slug || slugify(data.name);
     const existingSlug = await db.findOne<any>("course_categories", {
       slug: newSlug,
-      organization_id: orgId,
+      org_id: orgId,
     });
     if (existingSlug && existingSlug.id !== id) {
       throw new ConflictError(`A category with slug '${newSlug}' already exists`);
@@ -165,7 +165,7 @@ export async function updateCategory(
     }
     const parent = await db.findOne<any>("course_categories", {
       id: data.parent_id,
-      organization_id: orgId,
+      org_id: orgId,
     });
     if (!parent) {
       throw new NotFoundError("Parent category", data.parent_id);
@@ -185,7 +185,7 @@ export async function deleteCategory(orgId: number, id: string) {
 
   const category = await db.findOne<any>("course_categories", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!category) {
     throw new NotFoundError("Category", id);
@@ -205,7 +205,7 @@ export async function deleteCategory(orgId: number, id: string) {
   // Reassign subcategories to parent
   await db.updateMany(
     "course_categories",
-    { parent_id: id, organization_id: orgId },
+    { parent_id: id, org_id: orgId },
     { parent_id: category.parent_id || null }
   );
 

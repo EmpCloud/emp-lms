@@ -435,7 +435,7 @@ export async function registerUser(
 
   // Verify user exists
   const user = await findUserById(userId);
-  if (!user || user.organization_id !== orgId) {
+  if (!user || user.org_id !== orgId) {
     throw new NotFoundError("User", String(userId));
   }
 
@@ -544,7 +544,7 @@ export async function registerBulk(
 
     // Verify user exists in org
     const user = await findUserById(userId);
-    if (!user || user.organization_id !== orgId) {
+    if (!user || user.org_id !== orgId) {
       results.push({
         userId,
         status: "skipped",

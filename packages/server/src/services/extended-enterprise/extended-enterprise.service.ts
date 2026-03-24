@@ -272,7 +272,7 @@ export async function assignCoursesToPortal(
   for (const courseId of courseIds) {
     const course = await db.findOne<any>("courses", {
       id: courseId,
-      organization_id: orgId,
+      org_id: orgId,
     });
     if (!course) {
       throw new NotFoundError("Course", courseId);
@@ -320,7 +320,7 @@ export async function getPortalCourses(
     `SELECT c.*, cat.name AS category_name
      FROM courses c
      LEFT JOIN course_categories cat ON cat.id = c.category_id
-     WHERE c.id IN (${placeholders}) AND c.organization_id = ? AND c.status = 'published'
+     WHERE c.id IN (${placeholders}) AND c.org_id = ? AND c.status = 'published'
      ORDER BY c.title`,
     [...portal.course_ids, orgId]
   );

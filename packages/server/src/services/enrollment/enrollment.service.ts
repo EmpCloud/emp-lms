@@ -28,7 +28,7 @@ export async function enrollUser(
   // Validate course exists and is published
   const course = await db.findOne<any>("courses", {
     id: courseId,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", courseId);
@@ -85,7 +85,7 @@ export async function enrollUser(
 
   const enrollment = await db.create<any>("enrollments", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
     user_id: userId,
     course_id: courseId,
     status: "enrolled",
@@ -153,7 +153,7 @@ export async function getEnrollment(
   const db = getDB();
 
   const enrollment = await db.findOne<any>("enrollments", {
-    organization_id: orgId,
+    org_id: orgId,
     user_id: userId,
     course_id: courseId,
   });
@@ -193,7 +193,7 @@ export async function listUserEnrollments(
   const perPage = filters?.perPage || 20;
   const offset = (page - 1) * perPage;
 
-  let whereClause = "e.organization_id = ? AND e.user_id = ?";
+  let whereClause = "e.org_id = ? AND e.user_id = ?";
   const params: any[] = [orgId, userId];
 
   if (filters?.status) {
@@ -255,7 +255,7 @@ export async function listCourseEnrollments(
   const perPage = filters?.perPage || 20;
   const offset = (page - 1) * perPage;
 
-  let whereClause = "e.organization_id = ? AND e.course_id = ?";
+  let whereClause = "e.org_id = ? AND e.course_id = ?";
   const params: any[] = [orgId, courseId];
 
   if (filters?.status) {
@@ -303,7 +303,7 @@ export async function markLessonComplete(
   // Validate enrollment
   const enrollment = await db.findOne<any>("enrollments", {
     id: enrollmentId,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!enrollment) {
     throw new NotFoundError("Enrollment", enrollmentId);
@@ -442,7 +442,7 @@ export async function completeEnrollment(orgId: number, enrollmentId: string) {
 
   const enrollment = await db.findOne<any>("enrollments", {
     id: enrollmentId,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!enrollment) {
     throw new NotFoundError("Enrollment", enrollmentId);
@@ -500,7 +500,7 @@ export async function dropEnrollment(orgId: number, enrollmentId: string) {
 
   const enrollment = await db.findOne<any>("enrollments", {
     id: enrollmentId,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!enrollment) {
     throw new NotFoundError("Enrollment", enrollmentId);
@@ -541,7 +541,7 @@ export async function getMyProgress(
   const db = getDB();
 
   const enrollment = await db.findOne<any>("enrollments", {
-    organization_id: orgId,
+    org_id: orgId,
     user_id: userId,
     course_id: courseId,
   });
@@ -606,7 +606,7 @@ export async function getRecentActivity(
      JOIN course_modules m ON m.id = l.module_id
      JOIN courses c ON c.id = m.course_id
      JOIN enrollments e ON e.id = lp.enrollment_id
-     WHERE e.user_id = ? AND e.organization_id = ?
+     WHERE e.user_id = ? AND e.org_id = ?
      ORDER BY lp.updated_at DESC
      LIMIT ?`,
     [userId, orgId, limit]

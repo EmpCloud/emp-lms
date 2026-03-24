@@ -66,7 +66,7 @@ export async function createModule(
   // Validate course exists and belongs to org
   const course = await db.findOne<any>("courses", {
     id: courseId,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", courseId);
@@ -115,7 +115,7 @@ export async function updateModule(
   // Validate course belongs to org
   const course = await db.findOne<any>("courses", {
     id: mod.course_id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", mod.course_id);
@@ -140,7 +140,7 @@ export async function deleteModule(orgId: number, moduleId: string) {
   // Validate course belongs to org
   const course = await db.findOne<any>("courses", {
     id: mod.course_id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", mod.course_id);
@@ -165,7 +165,7 @@ export async function reorderModules(
   // Validate course belongs to org
   const course = await db.findOne<any>("courses", {
     id: courseId,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", courseId);

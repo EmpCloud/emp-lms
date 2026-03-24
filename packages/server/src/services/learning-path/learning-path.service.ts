@@ -421,7 +421,7 @@ export async function enrollUser(
 
   // Check user exists
   const user = await findUserById(userId);
-  if (!user || user.organization_id !== orgId) {
+  if (!user || user.org_id !== orgId) {
     throw new NotFoundError("User", String(userId));
   }
 

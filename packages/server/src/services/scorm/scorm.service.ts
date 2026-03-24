@@ -66,7 +66,7 @@ export async function uploadPackage(
   // Verify course exists
   const course = await db.findOne<any>("courses", {
     id: courseId,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", courseId);

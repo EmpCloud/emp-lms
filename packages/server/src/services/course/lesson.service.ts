@@ -69,7 +69,7 @@ export async function createLesson(
 
   const course = await db.findOne<any>("courses", {
     id: mod.course_id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", mod.course_id);
@@ -128,7 +128,7 @@ export async function updateLesson(
 
   const course = await db.findOne<any>("courses", {
     id: mod.course_id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", mod.course_id);
@@ -158,7 +158,7 @@ export async function deleteLesson(orgId: number, lessonId: string) {
 
   const course = await db.findOne<any>("courses", {
     id: mod.course_id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", mod.course_id);
@@ -188,7 +188,7 @@ export async function reorderLessons(
 
   const course = await db.findOne<any>("courses", {
     id: mod.course_id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", mod.course_id);

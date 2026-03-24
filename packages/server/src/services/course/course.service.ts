@@ -55,7 +55,7 @@ export async function listCourses(
   const sortField = filters.sort || "created_at";
   const sortOrder = filters.order || "desc";
 
-  let whereClause = "c.organization_id = ?";
+  let whereClause = "c.org_id = ?";
   const params: any[] = [orgId];
 
   if (filters.status) {
@@ -139,7 +139,7 @@ export async function getCourse(orgId: number, id: string) {
 
   const course = await db.findOne<any>("courses", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", id);
@@ -201,7 +201,7 @@ export async function createCourse(
   if (data.category_id) {
     const category = await db.findOne<any>("course_categories", {
       id: data.category_id,
-      organization_id: orgId,
+      org_id: orgId,
     });
     if (!category) {
       throw new NotFoundError("Category", data.category_id);
@@ -214,7 +214,7 @@ export async function createCourse(
   // Check slug uniqueness within org
   const existingSlug = await db.findOne<any>("courses", {
     slug,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (existingSlug) {
     throw new ConflictError(`A course with slug '${slug}' already exists`);
@@ -222,7 +222,7 @@ export async function createCourse(
 
   const course = await db.create<any>("courses", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
     created_by: userId,
     title: data.title,
     slug,
@@ -275,7 +275,7 @@ export async function updateCourse(
 
   const course = await db.findOne<any>("courses", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", id);
@@ -288,7 +288,7 @@ export async function updateCourse(
     const newSlug = data.slug || slugify(data.title);
     const existingSlug = await db.findOne<any>("courses", {
       slug: newSlug,
-      organization_id: orgId,
+      org_id: orgId,
     });
     if (existingSlug && existingSlug.id !== id) {
       throw new ConflictError(`A course with slug '${newSlug}' already exists`);
@@ -300,7 +300,7 @@ export async function updateCourse(
   if (data.category_id && data.category_id !== course.category_id) {
     const category = await db.findOne<any>("course_categories", {
       id: data.category_id,
-      organization_id: orgId,
+      org_id: orgId,
     });
     if (!category) {
       throw new NotFoundError("Category", data.category_id);
@@ -330,7 +330,7 @@ export async function deleteCourse(orgId: number, id: string) {
 
   const course = await db.findOne<any>("courses", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", id);
@@ -372,7 +372,7 @@ export async function publishCourse(orgId: number, id: string) {
 
   const course = await db.findOne<any>("courses", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", id);
@@ -430,7 +430,7 @@ export async function unpublishCourse(orgId: number, id: string) {
 
   const course = await db.findOne<any>("courses", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", id);
@@ -457,7 +457,7 @@ export async function duplicateCourse(
 
   const course = await db.findOne<any>("courses", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", id);
@@ -469,7 +469,7 @@ export async function duplicateCourse(
   // Create duplicate course
   await db.create<any>("courses", {
     id: newCourseId,
-    organization_id: orgId,
+    org_id: orgId,
     created_by: userId,
     title: `${course.title} (Copy)`,
     slug: newSlug,
@@ -633,7 +633,7 @@ export async function getCourseStats(orgId: number, id: string) {
 
   const course = await db.findOne<any>("courses", {
     id,
-    organization_id: orgId,
+    org_id: orgId,
   });
   if (!course) {
     throw new NotFoundError("Course", id);
@@ -687,7 +687,7 @@ export async function getPopularCourses(orgId: number, limit: number = 10) {
     `SELECT c.*, cat.name AS category_name
      FROM courses c
      LEFT JOIN course_categories cat ON cat.id = c.category_id
-     WHERE c.organization_id = ? AND c.status = 'published'
+     WHERE c.org_id = ? AND c.status = 'published'
      ORDER BY c.enrollment_count DESC
      LIMIT ?`,
     [orgId, limit]
@@ -710,7 +710,7 @@ export async function getRecommendedCourses(
   // Get user's preferred categories from learning profile
   const profile = await db.findOne<any>("user_learning_profiles", {
     user_id: userId,
-    organization_id: orgId,
+    org_id: orgId,
   });
 
   let courses: any[];
@@ -727,7 +727,7 @@ export async function getRecommendedCourses(
         `SELECT c.*, cat.name AS category_name
          FROM courses c
          LEFT JOIN course_categories cat ON cat.id = c.category_id
-         WHERE c.organization_id = ?
+         WHERE c.org_id = ?
            AND c.status = 'published'
            AND c.id NOT IN (
              SELECT e.course_id FROM enrollments e WHERE e.user_id = ?
@@ -742,7 +742,7 @@ export async function getRecommendedCourses(
         `SELECT c.*, cat.name AS category_name
          FROM courses c
          LEFT JOIN course_categories cat ON cat.id = c.category_id
-         WHERE c.organization_id = ?
+         WHERE c.org_id = ?
            AND c.status = 'published'
            AND c.id NOT IN (
              SELECT e.course_id FROM enrollments e WHERE e.user_id = ?
@@ -758,7 +758,7 @@ export async function getRecommendedCourses(
       `SELECT c.*, cat.name AS category_name
        FROM courses c
        LEFT JOIN course_categories cat ON cat.id = c.category_id
-       WHERE c.organization_id = ?
+       WHERE c.org_id = ?
          AND c.status = 'published'
          AND c.id NOT IN (
            SELECT e.course_id FROM enrollments e WHERE e.user_id = ?
