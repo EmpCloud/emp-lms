@@ -197,6 +197,17 @@ docker compose up -d
 Server: Node 20 Alpine + Chromium (for Puppeteer PDF generation), port 4700
 Client: Nginx Alpine serving Vite build, port 80 with SPA routing
 
+## Test Deployment
+
+| Environment | URL |
+|-------------|-----|
+| Frontend | https://testlms.empcloud.com |
+| API | https://testlms-api.empcloud.com |
+
+SSO integrated with EMP Cloud. Users can launch LMS directly from the EMP Cloud dashboard.
+
+---
+
 ## BullMQ Scheduled Jobs
 
 | Queue | Schedule | Purpose |
