@@ -1,4 +1,5 @@
-import { getKnex } from "./adapters/knex.adapter";
+import { getKnex, KnexAdapter } from "./adapters/knex.adapter";
+import { config } from "../config";
 import { v4 as uuidv4 } from "uuid";
 
 const ORG_ID = 1;
@@ -7,6 +8,17 @@ const INSTRUCTOR_USER_ID = 2;
 const LEARNER_USER_ID = 3;
 
 async function seed() {
+  // Initialize database connection
+  const adapter = new KnexAdapter({
+    client: "mysql2",
+    host: config.db.host,
+    port: config.db.port,
+    user: config.db.user,
+    password: config.db.password,
+    database: config.db.name,
+    pool: { min: config.db.poolMin, max: config.db.poolMax },
+  });
+  await adapter.connect();
   const knex = getKnex();
 
   try {
@@ -151,7 +163,7 @@ async function seed() {
         completion_criteria: "all_lessons",
         passing_score: 70,
         certificate_template_id: certTemplateId,
-        published_at: new Date().toISOString(),
+        published_at: new Date(),
         metadata: null,
         created_by: ADMIN_USER_ID,
       },
@@ -182,7 +194,7 @@ async function seed() {
         completion_criteria: "all_lessons",
         passing_score: 70,
         certificate_template_id: certTemplateId,
-        published_at: new Date().toISOString(),
+        published_at: new Date(),
         metadata: null,
         created_by: ADMIN_USER_ID,
       },
@@ -321,11 +333,11 @@ async function seed() {
         course_id: courseJsId,
         status: "in_progress",
         progress_percentage: 33.33,
-        enrolled_at: new Date().toISOString(),
-        started_at: new Date().toISOString(),
+        enrolled_at: new Date(),
+        started_at: new Date(),
         completed_at: null,
         due_date: null,
-        last_accessed_at: new Date().toISOString(),
+        last_accessed_at: new Date(),
         time_spent_minutes: 35,
         score: null,
       },
@@ -338,7 +350,7 @@ async function seed() {
         enrollment_id: enrollmentId,
         lesson_id: lessonWhatIsJsId,
         is_completed: true,
-        completed_at: new Date().toISOString(),
+        completed_at: new Date(),
         time_spent_minutes: 15,
         attempts: 1,
       },
@@ -347,7 +359,7 @@ async function seed() {
         enrollment_id: enrollmentId,
         lesson_id: lessonSetupId,
         is_completed: true,
-        completed_at: new Date().toISOString(),
+        completed_at: new Date(),
         time_spent_minutes: 20,
         attempts: 1,
       },
@@ -498,7 +510,7 @@ async function seed() {
         total_points_earned: 0,
         current_streak_days: 1,
         longest_streak_days: 1,
-        last_activity_at: new Date().toISOString(),
+        last_activity_at: new Date(),
       },
     ]);
 

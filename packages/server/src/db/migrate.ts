@@ -1,6 +1,18 @@
-import { getKnex } from "./adapters/knex.adapter";
+import { getKnex, KnexAdapter } from "./adapters/knex.adapter";
+import { config } from "../config";
 
 async function migrate() {
+  // Initialize database connection
+  const adapter = new KnexAdapter({
+    client: "mysql2",
+    host: config.db.host,
+    port: config.db.port,
+    user: config.db.user,
+    password: config.db.password,
+    database: config.db.name,
+    pool: { min: config.db.poolMin, max: config.db.poolMax },
+  });
+  await adapter.connect();
   const knex = getKnex();
   try {
     console.log("Running migrations...");

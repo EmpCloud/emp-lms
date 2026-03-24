@@ -36,14 +36,14 @@ router.post(
   }
 );
 
-// DELETE /video/:path — Delete video (hr_admin+)
+// DELETE /video/:videoPath — Delete video (hr_admin+)
 router.delete(
-  "/:path(*)",
+  "/:videoPath",
   authorize("super_admin", "org_admin", "hr_admin"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const orgId = req.user!.empcloudOrgId;
-      const videoPath = req.params.path;
+      const videoPath = req.params.videoPath;
 
       if (!videoPath) {
         throw new BadRequestError("Video path is required.");
