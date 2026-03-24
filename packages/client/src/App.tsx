@@ -55,15 +55,15 @@ function SSOGate({ children }: { children: React.ReactNode }) {
       try {
         const res = await apiPost<{
           user: Parameters<typeof login>[0];
-          accessToken: string;
-          refreshToken: string;
+          tokens: { accessToken: string; refreshToken: string };
+          accessToken?: string;
+          refreshToken?: string;
         }>("/auth/sso", { token: ssoToken });
 
         if (res.success && res.data) {
-          login(res.data.user, {
-            accessToken: res.data.accessToken,
-            refreshToken: res.data.refreshToken,
-          });
+          const accessToken = res.data.tokens?.accessToken || res.data.accessToken!;
+          const refreshToken = res.data.tokens?.refreshToken || res.data.refreshToken!;
+          login(res.data.user, { accessToken, refreshToken });
           toast.success("Signed in via SSO");
           navigate("/dashboard", { replace: true });
         }

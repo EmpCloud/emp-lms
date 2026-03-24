@@ -15,7 +15,11 @@ export function validateBody(schema: ZodSchema) {
 export function validateQuery(schema: ZodSchema) {
   return (req: Request, _res: Response, next: NextFunction) => {
     try {
-      req.query = schema.parse(req.query);
+      const parsed = schema.parse(req.query);
+      // In Express 5, req.query is read-only. Merge parsed values onto the existing object.
+      Object.keys(parsed).forEach((key) => {
+        (req.query as Record<string, any>)[key] = parsed[key];
+      });
       next();
     } catch (err) {
       next(err);
@@ -26,7 +30,10 @@ export function validateQuery(schema: ZodSchema) {
 export function validateParams(schema: ZodSchema) {
   return (req: Request, _res: Response, next: NextFunction) => {
     try {
-      req.params = schema.parse(req.params);
+      const parsed = schema.parse(req.params);
+      Object.keys(parsed).forEach((key) => {
+        (req.params as Record<string, any>)[key] = parsed[key];
+      });
       next();
     } catch (err) {
       next(err);
