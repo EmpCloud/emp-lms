@@ -24,7 +24,9 @@ declare global {
 export function authenticate(req: Request, _res: Response, next: NextFunction) {
   // Internal service bypass for dashboard widget data fetching
   const internalService = req.headers["x-internal-service"];
-  if (internalService === "empcloud-dashboard") {
+  const internalSecret = req.headers["x-internal-secret"];
+  const expectedSecret = process.env.INTERNAL_SERVICE_SECRET || "";
+  if (internalService === "empcloud-dashboard" && expectedSecret && internalSecret === expectedSecret) {
     const orgId = Number(req.query.organization_id);
     if (orgId) {
       req.user = {

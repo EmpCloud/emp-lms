@@ -106,6 +106,22 @@ export async function ssoLogin(empcloudToken: string): Promise<LoginResult> {
     throw new UnauthorizedError("SSO token missing user id");
   }
 
+  // Verify the token is a real, non-revoked EmpCloud access token
+  if (decoded.jti) {
+    const { getEmpCloudDB } = await import("../../db/empcloud");
+    const empcloudDb = getEmpCloudDB();
+    const tokenRow = await empcloudDb("oauth_access_tokens")
+      .where({ jti: decoded.jti })
+      .whereNull("revoked_at")
+      .where("expires_at", ">", new Date())
+      .first();
+    if (!tokenRow) {
+      throw new UnauthorizedError("Invalid or expired SSO token");
+    }
+  } else {
+    throw new UnauthorizedError("SSO token missing jti claim");
+  }
+
   const user = await findUserById(userId);
   if (!user || user.status !== 1) {
     throw new UnauthorizedError("User not found or inactive");
