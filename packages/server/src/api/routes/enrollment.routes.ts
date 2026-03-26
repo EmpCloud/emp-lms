@@ -152,6 +152,17 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const orgId = req.user!.empcloudOrgId;
+      const userId = req.user!.empcloudUserId;
+      const isAdmin = ["super_admin", "org_admin", "hr_admin"].includes(req.user!.role);
+
+      // Verify the requesting user owns this enrollment (or is admin)
+      if (!isAdmin) {
+        const enrollment = await enrollmentService.getEnrollmentById(orgId, req.params.id);
+        if (enrollment.user_id !== userId) {
+          return res.status(403).json({ success: false, error: "You can only complete lessons on your own enrollment" });
+        }
+      }
+
       const result = await enrollmentService.markLessonComplete(
         orgId,
         req.params.id,
@@ -188,6 +199,17 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const orgId = req.user!.empcloudOrgId;
+      const userId = req.user!.empcloudUserId;
+      const isAdmin = ["super_admin", "org_admin", "hr_admin"].includes(req.user!.role);
+
+      // Verify the requesting user owns this enrollment (or is admin)
+      if (!isAdmin) {
+        const existing = await enrollmentService.getEnrollmentById(orgId, req.params.id);
+        if (existing.user_id !== userId) {
+          return res.status(403).json({ success: false, error: "You can only drop your own enrollment" });
+        }
+      }
+
       const enrollment = await enrollmentService.dropEnrollment(orgId, req.params.id);
       sendSuccess(res, enrollment);
     } catch (err) {

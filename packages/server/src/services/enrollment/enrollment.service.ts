@@ -174,6 +174,22 @@ export async function getEnrollment(
 }
 
 // ---------------------------------------------------------------------------
+// Get enrollment by ID (for ownership checks)
+// ---------------------------------------------------------------------------
+
+export async function getEnrollmentById(orgId: number, enrollmentId: string) {
+  const db = getDB();
+  const enrollment = await db.findOne<any>("enrollments", {
+    id: enrollmentId,
+    org_id: orgId,
+  });
+  if (!enrollment) {
+    throw new NotFoundError("Enrollment", enrollmentId);
+  }
+  return enrollment;
+}
+
+// ---------------------------------------------------------------------------
 // List enrollments for a user (paginated)
 // ---------------------------------------------------------------------------
 

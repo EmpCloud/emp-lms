@@ -31,13 +31,28 @@ router.get(
   }
 );
 
-// GET /quizzes/:id — get single quiz (with answers for admin)
+// GET /quizzes/:id — get single quiz (with answers for admin only)
 router.get(
   "/:id",
   authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const quiz = await quizService.getQuiz(req.params.id);
+
+      // Strip correct answer info for non-admin users
+      const isAdmin = ADMIN_ROLES.includes(req.user!.role as any);
+      if (!isAdmin && quiz.questions) {
+        quiz.questions = quiz.questions.map((q: any) => ({
+          ...q,
+          options: Array.isArray(q.options)
+            ? q.options.map((opt: any) => {
+                const { is_correct, ...rest } = opt;
+                return rest;
+              })
+            : q.options,
+        }));
+      }
+
       sendSuccess(res, quiz);
     } catch (err) {
       next(err);
