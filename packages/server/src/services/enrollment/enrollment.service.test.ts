@@ -69,7 +69,7 @@ describe("enrollUser", () => {
 
     expect(mockDB.create).toHaveBeenCalledWith("enrollments", expect.objectContaining({
       id: "test-uuid-1234",
-      organization_id: 1,
+      org_id: 1,
       user_id: 42,
       course_id: "c1",
       status: "enrolled",

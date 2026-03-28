@@ -207,7 +207,7 @@ describe("createCourse", () => {
 
     expect(mockDB.create).toHaveBeenCalledWith("courses", expect.objectContaining({
       id: "test-uuid-1234",
-      organization_id: 1,
+      org_id: 1,
       created_by: 42,
       title: "New Course",
       slug: "new-course",
@@ -410,7 +410,7 @@ describe("duplicateCourse", () => {
   it("should deep copy a course with modules and lessons", async () => {
     mockDB.findOne.mockResolvedValue({
       id: "c1", title: "Original", description: "Desc",
-      organization_id: 1, category_id: null, tags: "[]",
+      org_id: 1, category_id: null, tags: "[]",
       prerequisites: "[]", metadata: "{}",
     });
     mockDB.create.mockResolvedValue({ id: "test-uuid-1234" });
