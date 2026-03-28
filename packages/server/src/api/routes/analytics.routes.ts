@@ -47,6 +47,42 @@ router.get(
   }
 );
 
+// GET /analytics/courses/:courseId — alias for /analytics/course/:courseId (#903)
+router.get(
+  "/courses/:courseId",
+  authorize("super_admin", "org_admin", "hr_admin"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = req.user!.empcloudOrgId;
+      const { courseId } = req.params;
+
+      const analytics = await analyticsService.getCourseAnalytics(orgId, courseId);
+      sendSuccess(res, analytics);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /analytics/users — list user-level analytics (hr_admin+) (#902)
+router.get(
+  "/users",
+  authorize("super_admin", "org_admin", "hr_admin"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = req.user!.empcloudOrgId;
+
+      const analytics = await analyticsService.getOrgAnalytics(orgId, {
+        start: req.query.start as string | undefined,
+        end: req.query.end as string | undefined,
+      });
+      sendSuccess(res, analytics);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // GET /analytics/user/:userId — User analytics (self or hr_admin)
 router.get(
   "/user/:userId",

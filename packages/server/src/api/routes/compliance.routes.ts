@@ -13,6 +13,55 @@ const router = Router();
 // All routes require authentication
 router.use(authenticate);
 
+// ---- Aliases (resolve before parameterized routes) ----
+
+// GET /compliance/my — alias for /compliance/records/my (#895)
+router.get(
+  "/my",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = req.user!.empcloudOrgId;
+      const userId = req.user!.empcloudUserId;
+      const { page, limit } = req.query;
+
+      const result = await complianceService.getUserComplianceRecords(
+        orgId,
+        userId,
+        {
+          page: page ? Number(page) : undefined,
+          limit: limit ? Number(limit) : undefined,
+        }
+      );
+
+      sendPaginated(res, result.data, result.total, result.page, result.limit);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /compliance/overdue — overdue compliance records (#896)
+router.get(
+  "/overdue",
+  authorize("super_admin", "org_admin", "hr_admin"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = req.user!.empcloudOrgId;
+      const { page, limit } = req.query;
+
+      const result = await complianceService.getComplianceRecords(orgId, {
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        status: "overdue",
+      });
+
+      sendPaginated(res, result.data, result.total, result.page, result.limit);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ---- Assignments ----
 
 // GET /compliance/assignments — list assignments (hr_admin+)

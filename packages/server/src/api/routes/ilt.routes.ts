@@ -13,6 +13,43 @@ const router = Router();
 // All routes require authentication
 router.use(authenticate);
 
+// GET /ilt — alias for /ilt/sessions (#898)
+router.get(
+  "/",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = req.user!.empcloudOrgId;
+      const {
+        page,
+        limit,
+        status,
+        course_id,
+        instructor_id,
+        start_date,
+        end_date,
+        sort,
+        order,
+      } = req.query;
+
+      const result = await iltService.listSessions(orgId, {
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        status: status as string,
+        course_id: course_id as string,
+        instructor_id: instructor_id ? Number(instructor_id) : undefined,
+        start_date: start_date as string,
+        end_date: end_date as string,
+        sort: sort as string,
+        order: order as "asc" | "desc",
+      });
+
+      sendPaginated(res, result.data, result.total, result.page, result.limit);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // ---- Session Queries ----
 
 // GET /ilt/sessions/upcoming — upcoming sessions

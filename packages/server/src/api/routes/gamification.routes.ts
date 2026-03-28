@@ -14,6 +14,65 @@ const router = Router();
 // All routes require authentication
 router.use(authenticate);
 
+// GET /gamification/my — combined points + streak for current user (#900)
+router.get(
+  "/my",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = req.user!.empcloudOrgId;
+      const userId = req.user!.empcloudUserId;
+
+      const points = await gamificationService.getUserPoints(orgId, userId);
+
+      const { getDB } = require("../../db/adapters/index") as { getDB: () => any };
+      const db = getDB();
+      const profile = await db.findOne("user_learning_profiles", {
+        org_id: orgId,
+        user_id: userId,
+      });
+
+      sendSuccess(res, {
+        points: points.points,
+        source: points.source,
+        current_streak_days: profile?.current_streak_days || 0,
+        longest_streak_days: profile?.longest_streak_days || 0,
+        total_courses_completed: profile?.total_courses_completed || 0,
+        total_time_spent_minutes: profile?.total_time_spent_minutes || 0,
+        last_activity_at: profile?.last_activity_at || null,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /gamification/badges — list available badges (#901)
+router.get(
+  "/badges",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = req.user!.empcloudOrgId;
+      const userId = req.user!.empcloudUserId;
+
+      // Return user badge data from local learning profile
+      const { getDB } = require("../../db/adapters/index") as { getDB: () => any };
+      const db = getDB();
+      const profile = await db.findOne("user_learning_profiles", {
+        org_id: orgId,
+        user_id: userId,
+      });
+
+      sendSuccess(res, {
+        badges: profile?.badges || [],
+        total_points_earned: profile?.total_points_earned || 0,
+        total_courses_completed: profile?.total_courses_completed || 0,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // GET /gamification/leaderboard — Get top learners
 router.get(
   "/leaderboard",
