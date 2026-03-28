@@ -15,7 +15,7 @@ import {
   Legend,
 } from "recharts";
 import { useOverviewAnalytics } from "@/api/hooks";
-import { useAuthStore } from "@/lib/auth-store";
+import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 
 const PIE_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899"];
 
@@ -48,7 +48,7 @@ export default function AnalyticsPage() {
   const { data, isLoading } = useOverviewAnalytics();
   const analytics = data?.data as any;
 
-  if (user?.role !== "admin" && user?.role !== "org_admin") {
+  if (!isAdminRole(user?.role)) {
     return (
       <div className="flex h-64 flex-col items-center justify-center text-center">
         <BarChart3 className="h-12 w-12 text-gray-400" />

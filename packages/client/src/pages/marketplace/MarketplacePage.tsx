@@ -3,7 +3,7 @@ import { Store, Search, Import, Loader2, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
 import { useMarketplace } from "@/api/hooks";
 import { apiPost } from "@/api/client";
-import { useAuthStore } from "@/lib/auth-store";
+import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 
 const TYPE_OPTIONS = [
   { value: "all", label: "All Types" },
@@ -32,7 +32,7 @@ function typeBadge(type: string) {
 
 export default function MarketplacePage() {
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === "admin" || user?.role === "org_admin";
+  const isAdmin = isAdminRole(user?.role);
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");

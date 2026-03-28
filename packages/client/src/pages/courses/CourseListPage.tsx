@@ -13,7 +13,7 @@ import {
   FolderOpen,
 } from "lucide-react";
 import { useCourses, useCategories } from "@/api/hooks";
-import { useAuthStore } from "@/lib/auth-store";
+import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 import { formatDuration, cn } from "@/lib/utils";
 
 const DIFFICULTIES = ["All", "Beginner", "Intermediate", "Advanced"] as const;
@@ -65,7 +65,7 @@ function CardSkeleton() {
 export default function CourseListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
+  const isAdmin = isAdminRole(user?.role);
 
   /* Filters from URL */
   const search = searchParams.get("search") ?? "";

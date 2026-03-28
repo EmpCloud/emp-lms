@@ -16,13 +16,13 @@ import {
 import toast from "react-hot-toast";
 import { useCourses, useDiscussions } from "@/api/hooks";
 import { apiPost, apiPatch, apiDelete } from "@/api/client";
-import { useAuthStore } from "@/lib/auth-store";
+import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 
 const ITEMS_PER_PAGE = 10;
 
 export default function DiscussionsPage() {
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+  const isAdmin = isAdminRole(user?.role);
   const queryClient = useQueryClient();
 
   const [selectedCourseId, setSelectedCourseId] = useState("");

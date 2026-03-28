@@ -12,7 +12,7 @@ import {
 import toast from "react-hot-toast";
 import { useCourses } from "@/api/hooks";
 import { apiPost } from "@/api/client";
-import { useAuthStore } from "@/lib/auth-store";
+import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 
 interface BulkEnrollResult {
   success_count?: number;
@@ -26,7 +26,7 @@ interface BulkEnrollResult {
 
 export default function BulkEnrollPage() {
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+  const isAdmin = isAdminRole(user?.role);
 
   const [selectedCourseId, setSelectedCourseId] = useState("");
   const [userIdsText, setUserIdsText] = useState("");

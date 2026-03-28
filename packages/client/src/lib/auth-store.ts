@@ -80,3 +80,10 @@ export function getUser(): AuthUser | null {
 export function getToken(): string | null {
   return localStorage.getItem("access_token");
 }
+
+/** Admin roles that match the server-side adminRoles: super_admin, org_admin, hr_admin */
+const ADMIN_ROLES = ["super_admin", "org_admin", "hr_admin"];
+
+export function isAdminRole(role: string | undefined | null): boolean {
+  return !!role && ADMIN_ROLES.includes(role);
+}

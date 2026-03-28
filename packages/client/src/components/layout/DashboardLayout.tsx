@@ -17,7 +17,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { useAuthStore } from "@/lib/auth-store";
+import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 
 interface NavItem {
   label: string;
@@ -54,7 +54,7 @@ export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuthStore();
 
-  const isAdmin = user?.role === "admin" || user?.role === "org_admin";
+  const isAdmin = isAdminRole(user?.role);
   const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   const firstName = user?.firstName ?? "";
