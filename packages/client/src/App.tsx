@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useState } from "react";
-import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuthStore, extractSSOToken } from "@/lib/auth-store";
@@ -41,7 +41,6 @@ function LoadingSpinner() {
 // ---------- SSO Gate ----------
 function SSOGate({ children }: { children: React.ReactNode }) {
   const login = useAuthStore((s) => s.login);
-  const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
@@ -65,7 +64,11 @@ function SSOGate({ children }: { children: React.ReactNode }) {
           const refreshToken = res.data.tokens?.refreshToken || res.data.refreshToken!;
           login(res.data.user, { accessToken, refreshToken });
           toast.success("Signed in via SSO");
-          navigate("/dashboard", { replace: true });
+          // Use window.location.replace instead of navigate to ensure
+          // ProtectedRoute sees the updated auth state from localStorage
+          // after a full page load (avoids race with zustand hydration)
+          window.location.replace("/dashboard");
+          return;
         }
       } catch {
         toast.error("SSO authentication failed");
