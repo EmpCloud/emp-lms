@@ -85,7 +85,15 @@ export function authorize(...roles: AuthPayload["role"][]) {
     if (!req.user) {
       return next(new AppError(401, "UNAUTHORIZED", "Not authenticated"));
     }
-    if (roles.length > 0 && !roles.includes(req.user.role)) {
+    // org_admin is a superset of hr_admin — grant access whenever any admin role is allowed
+    const effectiveRoles = [...roles];
+    if (
+      (roles.includes("hr_admin") || roles.includes("hr_manager")) &&
+      !roles.includes("org_admin")
+    ) {
+      effectiveRoles.push("org_admin");
+    }
+    if (effectiveRoles.length > 0 && !effectiveRoles.includes(req.user.role)) {
       return next(
         new AppError(403, "FORBIDDEN", "You do not have permission to perform this action")
       );
