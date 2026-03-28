@@ -42,15 +42,18 @@ router.get(
       // Strip correct answer info for non-admin users
       const isAdmin = ADMIN_ROLES.includes(req.user!.role as any);
       if (!isAdmin && quiz.questions) {
-        quiz.questions = quiz.questions.map((q: any) => ({
-          ...q,
-          options: Array.isArray(q.options)
-            ? q.options.map((opt: any) => {
-                const { is_correct, ...rest } = opt;
-                return rest;
-              })
-            : q.options,
-        }));
+        quiz.questions = quiz.questions.map((q: any) => {
+          const { explanation, ...questionRest } = q;
+          return {
+            ...questionRest,
+            options: Array.isArray(q.options)
+              ? q.options.map((opt: any) => {
+                  const { is_correct, match_target, ...rest } = opt;
+                  return rest;
+                })
+              : q.options,
+          };
+        });
       }
 
       sendSuccess(res, quiz);

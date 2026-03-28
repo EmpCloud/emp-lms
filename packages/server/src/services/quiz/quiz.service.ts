@@ -116,13 +116,17 @@ export async function getQuizForAttempt(quizId: string, userId: number) {
     const options: QuestionOption[] =
       typeof q.options === "string" ? JSON.parse(q.options) : q.options || [];
 
-    // Strip correct-answer indicators from options
-    const sanitizedOptions = options.map((opt: QuestionOption) => ({
-      id: opt.id,
-      text: opt.text,
-      ...(opt.match_target !== undefined ? { match_target: undefined } : {}),
-      ...(opt.sort_order !== undefined ? { sort_order: opt.sort_order } : {}),
-    }));
+    // Strip correct-answer indicators (is_correct, match_target) from options
+    const sanitizedOptions = options.map((opt: QuestionOption) => {
+      const sanitized: Record<string, any> = {
+        id: opt.id,
+        text: opt.text,
+      };
+      if (opt.sort_order !== undefined) {
+        sanitized.sort_order = opt.sort_order;
+      }
+      return sanitized;
+    });
 
     return {
       id: q.id,
