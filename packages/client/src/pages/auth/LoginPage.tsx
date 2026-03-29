@@ -77,7 +77,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen">
       {/* Left brand panel — hidden on mobile */}
-      <div className="hidden lg:flex lg:w-1/2 items-center justify-center bg-gradient-to-br from-indigo-600 to-indigo-800 p-12">
+      <div className="hidden lg:flex lg:w-1/2 items-center justify-center bg-gradient-to-br from-brand-600 to-brand-800 p-12">
         <div className="max-w-md text-white">
           <div className="mb-8 flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
@@ -90,15 +90,15 @@ export default function LoginPage() {
             Empower learning and development
           </h1>
 
-          <p className="mt-4 text-lg text-indigo-100">
+          <p className="mt-4 text-lg text-brand-100">
             Create courses, run quizzes, track certifications, manage compliance
             training, and build learning paths &mdash; all in one place.
           </p>
 
           <div className="mt-10 grid grid-cols-2 gap-3">
             {FEATURES.map((f) => (
-              <div key={f} className="flex items-center gap-2 text-sm text-indigo-100">
-                <span className="h-1.5 w-1.5 rounded-full bg-indigo-300" />
+              <div key={f} className="flex items-center gap-2 text-sm text-brand-100">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand-300" />
                 {f}
               </div>
             ))}
@@ -111,7 +111,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Mobile-only branding */}
           <div className="mb-8 text-center lg:hidden">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white">
               <GraduationCap className="h-8 w-8" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">EMP LMS</h1>
@@ -147,7 +147,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 />
               </div>
 
@@ -168,7 +168,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="block w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm shadow-sm placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                   />
                   <button
                     type="button"
@@ -189,7 +189,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={mutation.isPending}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {mutation.isPending ? "Signing in..." : "Sign in"}
