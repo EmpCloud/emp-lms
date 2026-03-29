@@ -18,6 +18,9 @@ const MyLearningPage = lazy(() => import("@/pages/courses/MyLearningPage"));
 const LearningPathsPage = lazy(() => import("@/pages/learning-paths/LearningPathsPage"));
 const LearningPathDetailPage = lazy(() => import("@/pages/learning-paths/LearningPathDetailPage"));
 const QuizPage = lazy(() => import("@/pages/quizzes/QuizPage"));
+const QuizManagePage = lazy(() => import("@/pages/quizzes/QuizManagePage"));
+const QuizAttemptPage = lazy(() => import("@/pages/quizzes/QuizAttemptPage"));
+const ScormPlayerPage = lazy(() => import("@/pages/scorm/ScormPlayerPage"));
 const CertificationsPage = lazy(() => import("@/pages/certifications/CertificationsPage"));
 const CompliancePage = lazy(() => import("@/pages/compliance/CompliancePage"));
 const ILTPage = lazy(() => import("@/pages/ilt/ILTPage"));
@@ -129,7 +132,10 @@ export default function App() {
             <Route path="/my-learning" element={<MyLearningPage />} />
             <Route path="/learning-paths" element={<LearningPathsPage />} />
             <Route path="/learning-paths/:id" element={<LearningPathDetailPage />} />
+            <Route path="/quizzes/manage" element={<QuizManagePage />} />
             <Route path="/quizzes/:id" element={<QuizPage />} />
+            <Route path="/quizzes/:id/attempt" element={<QuizAttemptPage />} />
+            <Route path="/scorm/:packageId" element={<ScormPlayerPage />} />
             <Route path="/certifications" element={<CertificationsPage />} />
             <Route path="/compliance" element={<CompliancePage />} />
             <Route path="/ilt" element={<ILTPage />} />

@@ -78,6 +78,27 @@ export async function listQuizzes(courseId: string) {
   return result.data;
 }
 
+export async function listAllQuizzes(
+  orgId: number,
+  options?: { page?: number; limit?: number; course_id?: string }
+) {
+  const db = getDB();
+  const filters: Record<string, any> = { org_id: orgId };
+  if (options?.course_id) {
+    filters.course_id = options.course_id;
+  }
+  const page = options?.page || 1;
+  const limit = options?.limit || 50;
+  const result = await db.findMany<any>("quizzes", {
+    filters,
+    sort: { field: "created_at", order: "desc" },
+    limit,
+    offset: (page - 1) * limit,
+  });
+  const total = await db.count("quizzes", filters);
+  return { data: result.data, total, page, limit };
+}
+
 export async function getQuiz(quizId: string) {
   const db = getDB();
   const quiz = await db.findById<any>("quizzes", quizId);

@@ -16,8 +16,9 @@ interface LoginResponse {
     lastName: string;
     orgName: string;
   };
-  accessToken: string;
-  refreshToken: string;
+  tokens?: { accessToken: string; refreshToken: string };
+  accessToken?: string;
+  refreshToken?: string;
 }
 
 export default function LoginPage() {
@@ -42,10 +43,9 @@ export default function LoginPage() {
       return res.data;
     },
     onSuccess: (data) => {
-      login(data.user, {
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-      });
+      const accessToken = data.tokens?.accessToken || data.accessToken!;
+      const refreshToken = data.tokens?.refreshToken || data.refreshToken!;
+      login(data.user, { accessToken, refreshToken });
       toast.success("Welcome back!");
       navigate("/dashboard", { replace: true });
     },

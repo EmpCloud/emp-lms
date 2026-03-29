@@ -5,7 +5,7 @@
 
 import { Router, Request, Response, NextFunction } from "express";
 import * as quizService from "../../services/quiz/quiz.service";
-import { sendSuccess } from "../../utils/response";
+import { sendSuccess, sendPaginated } from "../../utils/response";
 import { authenticate, authorize } from "../middleware/auth.middleware";
 import { BadRequestError } from "../../utils/errors";
 
@@ -16,6 +16,27 @@ const ADMIN_ROLES = ["super_admin", "org_admin", "hr_admin"] as const;
 // ---------------------------------------------------------------------------
 // Quiz CRUD
 // ---------------------------------------------------------------------------
+
+// GET /quizzes — list all quizzes for the org (admin)
+router.get(
+  "/",
+  authenticate,
+  authorize(...ADMIN_ROLES),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = req.user!.empcloudOrgId;
+      const { page, limit, course_id } = req.query;
+      const result = await quizService.listAllQuizzes(orgId, {
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        course_id: course_id as string,
+      });
+      sendPaginated(res, result.data, result.total, result.page, result.limit);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 // GET /quizzes/course/:courseId — list quizzes for a course
 router.get(

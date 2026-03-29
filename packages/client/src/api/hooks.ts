@@ -42,6 +42,9 @@ export function useEnroll() {
 }
 
 // ── Quizzes ───────────────────────────────────────────────────────────────
+export function useAllQuizzes(params?: Record<string, any>) {
+  return useQuery({ queryKey: ["quizzes", "all", params], queryFn: () => apiGet<any>("/quizzes", params) });
+}
 export function useQuizzes(courseId: string) {
   return useQuery({ queryKey: ["quizzes", courseId], queryFn: () => apiGet<any>("/quizzes", { course_id: courseId }), enabled: !!courseId });
 }
@@ -69,6 +72,12 @@ export function useMyCertificates(params?: Record<string, any>) {
 // ── Compliance ────────────────────────────────────────────────────────────
 export function useMyCompliance(params?: Record<string, any>) {
   return useQuery({ queryKey: ["compliance", "my", params], queryFn: () => apiGet<any>("/compliance/my", params) });
+}
+export function useComplianceDashboard() {
+  return useQuery({ queryKey: ["compliance", "dashboard"], queryFn: () => apiGet<any>("/compliance/dashboard") });
+}
+export function useComplianceRecords(params?: Record<string, any>) {
+  return useQuery({ queryKey: ["compliance", "records", params], queryFn: () => apiGet<any>("/compliance/records", params) });
 }
 
 // ── ILT Sessions ──────────────────────────────────────────────────────────
