@@ -61,6 +61,11 @@ export function extractSSOToken(): string | null {
   const params = new URLSearchParams(window.location.search);
   const ssoToken = params.get("sso_token");
   if (!ssoToken) return null;
+
+  // Mark that this session came from EMP Cloud SSO
+  localStorage.setItem('sso_source', 'empcloud');
+  localStorage.setItem('empcloud_return_url', 'https://test-empcloud.empcloud.com/dashboard');
+
   const url = new URL(window.location.href);
   url.searchParams.delete("sso_token");
   window.history.replaceState({}, "", url.pathname + url.hash);

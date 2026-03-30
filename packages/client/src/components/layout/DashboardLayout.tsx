@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuthStore, isAdminRole } from "@/lib/auth-store";
+import { BackToDashboard } from "@/components/BackToDashboard";
 
 interface NavItem {
   label: string;
@@ -150,6 +151,7 @@ export default function DashboardLayout() {
           >
             <Menu className="h-6 w-6" />
           </button>
+          <BackToDashboard />
           <div className="flex-1" />
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-gray-600 sm:inline">{user?.orgName}</span>
