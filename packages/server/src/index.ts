@@ -52,6 +52,10 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (config.cors.origin === "*") return callback(null, true);
+      // Allow empcloud.com subdomains (production & test)
+      if (origin.endsWith(".empcloud.com") && origin.startsWith("https://")) {
+        return callback(null, true);
+      }
       if (
         config.env === "development" &&
         (origin.startsWith("http://localhost") ||

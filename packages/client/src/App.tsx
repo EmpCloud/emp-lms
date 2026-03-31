@@ -53,6 +53,18 @@ function SSOGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    let cancelled = false;
+
+    // Timeout to prevent infinite loading if the API is unreachable
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
+        cancelled = true;
+        console.error("SSO exchange timed out after 10s");
+        toast.error("SSO login timed out. The server may be unavailable.");
+        setChecking(false);
+      }
+    }, 10000);
+
     (async () => {
       try {
         const res = await apiPost<{
@@ -61,6 +73,9 @@ function SSOGate({ children }: { children: React.ReactNode }) {
           accessToken?: string;
           refreshToken?: string;
         }>("/auth/sso", { token: ssoToken });
+
+        if (cancelled) return;
+        clearTimeout(timeout);
 
         if (res.success && res.data) {
           const accessToken = res.data.tokens?.accessToken || res.data.accessToken!;
@@ -73,12 +88,21 @@ function SSOGate({ children }: { children: React.ReactNode }) {
           window.location.replace("/dashboard");
           return;
         }
-      } catch {
-        toast.error("SSO authentication failed");
+      } catch (err: any) {
+        if (cancelled) return;
+        clearTimeout(timeout);
+        const message = err?.response?.data?.error?.message || "SSO authentication failed";
+        console.error("SSO exchange failed:", err);
+        toast.error(message);
       } finally {
-        setChecking(false);
+        if (!cancelled) setChecking(false);
       }
     })();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (checking) return <LoadingSpinner />;
