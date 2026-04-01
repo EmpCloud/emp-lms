@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 
+// Fully disable rate limiting when RATE_LIMIT_DISABLED=true
+const rateLimitDisabled = process.env.RATE_LIMIT_DISABLED === "true";
+
 // Simple in-memory rate limiter (no Redis dependency required)
 const store = new Map<string, { count: number; resetAt: number }>();
 
@@ -21,6 +24,7 @@ export function rateLimit(options: RateLimitOptions) {
   const { windowMs, max, keyFn } = options;
 
   return (req: Request, res: Response, next: NextFunction) => {
+    if (rateLimitDisabled) return next();
     const key = keyFn ? keyFn(req) : (req.ip || "unknown");
     const now = Date.now();
     const record = store.get(key);
