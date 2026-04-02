@@ -32,6 +32,7 @@ import { recommendationRoutes } from "./api/routes/recommendation.routes";
 import { notificationRoutes } from "./api/routes/notification.routes";
 import { discussionRoutes } from "./api/routes/discussion.routes";
 import { ratingRoutes } from "./api/routes/rating.routes";
+import { settingsRoutes } from "./api/routes/settings.routes";
 
 // Middleware imports
 import { errorHandler } from "./api/middleware/error.middleware";
@@ -109,6 +110,7 @@ v1.use("/recommendations", recommendationRoutes);
 v1.use("/notifications", notificationRoutes);
 v1.use("/discussions", discussionRoutes);
 v1.use("/ratings", ratingRoutes);
+v1.use("/users/me/preferences", settingsRoutes);
 
 app.use("/api/v1", v1);
 

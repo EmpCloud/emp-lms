@@ -99,12 +99,15 @@ export async function listItems(
     WHERE ${whereClause}
   `;
 
-  const [data, countResult] = await Promise.all([
-    db.raw<ContentLibraryItem[]>(dataQuery, params),
-    db.raw<any[]>(countQuery, countParams),
+  const [rawData, rawCount] = await Promise.all([
+    db.raw<any>(dataQuery, params),
+    db.raw<any>(countQuery, countParams),
   ]);
 
-  const total = countResult[0]?.total || 0;
+  // MySQL raw returns [rows, fields] — extract just the rows
+  const data: ContentLibraryItem[] = Array.isArray(rawData[0]) ? rawData[0] : rawData;
+  const countRows = Array.isArray(rawCount[0]) ? rawCount[0] : rawCount;
+  const total = countRows[0]?.total || 0;
 
   return { data, total, page, perPage };
 }
@@ -276,16 +279,17 @@ export async function importToCourse(
   const db = getDB();
 
   // Verify item exists and belongs to org (or is public)
-  const item = await db.raw<any[]>(
+  const rawItem = await db.raw<any>(
     `SELECT * FROM content_library WHERE id = ? AND (org_id = ? OR is_public = 1)`,
     [itemId, orgId]
   );
+  const itemRows = Array.isArray(rawItem[0]) ? rawItem[0] : rawItem;
 
-  if (!item || item.length === 0) {
+  if (!itemRows || itemRows.length === 0) {
     throw new NotFoundError("Content Library Item", itemId);
   }
 
-  const contentItem = item[0];
+  const contentItem = itemRows[0];
 
   // Verify course exists
   const course = await db.findOne<any>("courses", {
@@ -306,11 +310,12 @@ export async function importToCourse(
   }
 
   // Get the highest sort_order in the module
-  const maxSortResult = await db.raw<any[]>(
+  const rawMaxSort = await db.raw<any>(
     `SELECT MAX(sort_order) AS max_sort FROM lessons WHERE module_id = ?`,
     [moduleId]
   );
-  const nextSort = (maxSortResult[0]?.max_sort || 0) + 1;
+  const maxSortRows = Array.isArray(rawMaxSort[0]) ? rawMaxSort[0] : rawMaxSort;
+  const nextSort = (maxSortRows[0]?.max_sort || 0) + 1;
 
   // Create a lesson from the library item
   const lessonId = uuidv4();
@@ -386,12 +391,15 @@ export async function getPublicItems(
     WHERE ${whereClause}
   `;
 
-  const [data, countResult] = await Promise.all([
-    db.raw<ContentLibraryItem[]>(dataQuery, params),
-    db.raw<any[]>(countQuery, countParams),
+  const [rawData, rawCount] = await Promise.all([
+    db.raw<any>(dataQuery, params),
+    db.raw<any>(countQuery, countParams),
   ]);
 
-  const total = countResult[0]?.total || 0;
+  // MySQL raw returns [rows, fields] — extract just the rows
+  const data: ContentLibraryItem[] = Array.isArray(rawData[0]) ? rawData[0] : rawData;
+  const countRows = Array.isArray(rawCount[0]) ? rawCount[0] : rawCount;
+  const total = countRows[0]?.total || 0;
 
   return { data, total, page, perPage };
 }
