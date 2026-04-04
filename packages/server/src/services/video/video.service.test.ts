@@ -37,6 +37,8 @@ vi.mock("fs", () => ({
   statSync: vi.fn(),
 }));
 
+import { execFile } from "child_process";
+
 vi.mock("child_process", () => ({
   execFile: vi.fn((_cmd: any, _args: any, _opts: any, cb: any) => {
     cb(new Error("ffprobe not available"), "", "");
@@ -179,5 +181,53 @@ describe("getVideoMetadata", () => {
 
     expect(result.size).toBe(0);
     expect(result.duration).toBe(0);
+  });
+
+  it("should return duration from ffprobe when available", async () => {
+    (fs.statSync as any).mockReturnValue({ size: 3000 });
+    // Override execFile mock for this test to simulate success
+    (execFile as any).mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+      cb(null, "120.5\n", "");
+    });
+
+    const result = await getVideoMetadata("/tmp/video.mp4");
+
+    expect(result.size).toBe(3000);
+    expect(result.duration).toBe(121); // Math.round(120.5)
+  });
+
+  it("should return 0 duration when ffprobe returns NaN", async () => {
+    (fs.statSync as any).mockReturnValue({ size: 1000 });
+    (execFile as any).mockImplementationOnce((_cmd: any, _args: any, _opts: any, cb: any) => {
+      cb(null, "N/A\n", "");
+    });
+
+    const result = await getVideoMetadata("/tmp/video.mp4");
+
+    expect(result.size).toBe(1000);
+    expect(result.duration).toBe(0);
+  });
+});
+
+// ── uploadVideo — cross-device cleanup failure ────────────────────────
+
+describe("uploadVideo — cleanup failure", () => {
+  it("should handle cleanup failure after cross-device copy gracefully", async () => {
+    (fs.mkdirSync as any).mockReturnValue(undefined);
+    (fs.renameSync as any).mockImplementation(() => { throw new Error("cross-device"); });
+    (fs.copyFileSync as any).mockReturnValue(undefined);
+    (fs.unlinkSync as any).mockImplementation(() => { throw new Error("EPERM"); }); // cleanup fails
+    (fs.statSync as any).mockReturnValue({ size: 1024 });
+
+    const file = {
+      path: "/tmp/tmp-upload",
+      originalname: "video.mp4",
+      size: 1024,
+      mimetype: "video/mp4",
+    } as Express.Multer.File;
+
+    // Should not throw even when cleanup fails
+    const result = await uploadVideo(1, file);
+    expect(result.id).toBe("test-uuid-1234");
   });
 });

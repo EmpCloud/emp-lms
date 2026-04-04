@@ -22,6 +22,7 @@ import {
   enrollUser,
   enrollBulk,
   getEnrollment,
+  getEnrollmentById,
   listUserEnrollments,
   listCourseEnrollments,
   markLessonComplete,
@@ -196,6 +197,49 @@ describe("getEnrollment", () => {
     mockDB.findOne.mockResolvedValue(null);
 
     await expect(getEnrollment(1, 42, "c1")).rejects.toThrow("not found");
+  });
+});
+
+// ── getEnrollmentById ──────────────────────────────────────────────────
+
+describe("getEnrollmentById", () => {
+  it("should return enrollment by id", async () => {
+    mockDB.findOne.mockResolvedValue({ id: "e1", org_id: 1, status: "enrolled" });
+
+    const result = await getEnrollmentById(1, "e1");
+    expect(result.id).toBe("e1");
+  });
+
+  it("should throw NotFoundError when enrollment does not exist", async () => {
+    mockDB.findOne.mockResolvedValue(null);
+
+    await expect(getEnrollmentById(1, "nonexistent")).rejects.toThrow("not found");
+  });
+});
+
+// ── markLessonComplete — existing progress update ──────────────────────
+
+describe("markLessonComplete — existing progress", () => {
+  it("should update existing lesson progress instead of creating new", async () => {
+    mockDB.findOne
+      .mockResolvedValueOnce({ id: "e1", status: "in_progress", course_id: "c1", organization_id: 1, started_at: "2026-01-01" })
+      .mockResolvedValueOnce({ id: "lp1", enrollment_id: "e1", lesson_id: "l1", time_spent_minutes: 10, attempts: 2 }); // existing progress
+    mockDB.raw.mockResolvedValueOnce([{ id: "l1" }]); // lesson validation
+    mockDB.update.mockResolvedValue({});
+    mockDB.findById.mockResolvedValue({ id: "e1", course_id: "c1" });
+    mockDB.raw
+      .mockResolvedValueOnce([{ total: 5 }])
+      .mockResolvedValueOnce([{ total: 3 }]);
+
+    const result = await markLessonComplete(1, "e1", "l1", 15);
+
+    // Should update existing progress, not create
+    expect(mockDB.update).toHaveBeenCalledWith("lesson_progress", "lp1", expect.objectContaining({
+      is_completed: true,
+      time_spent_minutes: 25, // 10 + 15
+      attempts: 3, // 2 + 1
+    }));
+    expect(mockDB.create).not.toHaveBeenCalledWith("lesson_progress", expect.anything());
   });
 });
 

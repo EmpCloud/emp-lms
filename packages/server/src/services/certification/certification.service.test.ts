@@ -453,6 +453,42 @@ describe("renewCertificate", () => {
     await expect(renewCertificate(1, "cert-1")).rejects.toThrow("does not belong");
   });
 
+  it("should renew a revoked certificate without changing old status to expired", async () => {
+    mockDB.findById.mockResolvedValueOnce({
+      id: "cert-old",
+      org_id: 1,
+      user_id: 42,
+      course_id: "course-1",
+      enrollment_id: "enr-1",
+      status: "revoked",
+      certificate_number: "CERT-REVOKED",
+      issued_at: "2025-01-01",
+      template_id: null,
+    });
+    // For revoked certs, the old cert should NOT be updated to expired
+    mockDB.create.mockResolvedValue({
+      id: "test-uuid-1234",
+      org_id: 1,
+      user_id: 42,
+      status: "active",
+      pdf_url: null,
+    });
+
+    const result = await renewCertificate(1, "cert-old");
+
+    // Should NOT call update on old cert (since revoked stays revoked)
+    expect(mockDB.update).not.toHaveBeenCalledWith(
+      "certificates",
+      "cert-old",
+      expect.objectContaining({ status: "expired" })
+    );
+    expect(result.status).toBe("active");
+    expect(lmsEvents.emit).toHaveBeenCalledWith(
+      "certificate.issued",
+      expect.objectContaining({ certificateId: "test-uuid-1234" })
+    );
+  });
+
   it("should throw BadRequestError when certificate is still active", async () => {
     mockDB.findById.mockResolvedValueOnce({
       id: "cert-1",

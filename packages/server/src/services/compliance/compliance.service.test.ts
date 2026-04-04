@@ -174,6 +174,77 @@ describe("createAssignment", () => {
       })
     ).rejects.toThrow("Invalid due_date");
   });
+
+  it("should create assignment for department type", async () => {
+    mockDB.findOne.mockResolvedValueOnce({ id: "course-1", org_id: 1 });
+    mockEmpDbChain.select.mockResolvedValue([{ id: 10 }, { id: 11 }]);
+    mockDB.create.mockResolvedValue({
+      id: "test-uuid-1234",
+      org_id: 1,
+      name: "Dept Training",
+      assigned_to_type: "department",
+    });
+
+    const result = await createAssignment(1, 42, {
+      course_id: "course-1",
+      name: "Dept Training",
+      assigned_to_type: "department",
+      assigned_to_ids: [5],
+      due_date: "2026-06-01",
+    });
+
+    expect(result.records_created).toBe(2);
+  });
+
+  it("should create assignment for role type", async () => {
+    mockDB.findOne.mockResolvedValueOnce({ id: "course-1", org_id: 1 });
+    mockEmpDbChain.select.mockResolvedValue([{ id: 20 }]);
+    mockDB.create.mockResolvedValue({
+      id: "test-uuid-1234",
+      org_id: 1,
+      name: "Role Training",
+      assigned_to_type: "role",
+    });
+
+    const result = await createAssignment(1, 42, {
+      course_id: "course-1",
+      name: "Role Training",
+      assigned_to_type: "role",
+      assigned_to_ids: ["hr_admin"],
+      due_date: "2026-06-01",
+    });
+
+    expect(result.records_created).toBe(1);
+  });
+
+  it("should throw BadRequestError for department type without assigned_to_ids", async () => {
+    mockDB.findOne.mockResolvedValueOnce({ id: "course-1", org_id: 1 });
+    mockDB.create.mockResolvedValue({ id: "test-uuid-1234", assigned_to_type: "department" });
+
+    await expect(
+      createAssignment(1, 42, {
+        course_id: "course-1",
+        name: "Test",
+        assigned_to_type: "department",
+        assigned_to_ids: [],
+        due_date: "2026-06-01",
+      })
+    ).rejects.toThrow("assigned_to_ids required");
+  });
+
+  it("should throw BadRequestError for invalid assigned_to_type", async () => {
+    mockDB.findOne.mockResolvedValueOnce({ id: "course-1", org_id: 1 });
+    mockDB.create.mockResolvedValue({ id: "test-uuid-1234" });
+
+    await expect(
+      createAssignment(1, 42, {
+        course_id: "course-1",
+        name: "Test",
+        assigned_to_type: "invalid" as any,
+        due_date: "2026-06-01",
+      })
+    ).rejects.toThrow("Invalid assigned_to_type");
+  });
 });
 
 // ── listAssignments ─────────────────────────────────────────────────────
@@ -569,6 +640,53 @@ describe("getComplianceDashboard", () => {
     const result = await getComplianceDashboard(1);
 
     expect(result.completion_rate).toBe(0);
+  });
+});
+
+// ── processRecurringAssignments ────────────────────────────────────────
+
+describe("processRecurringAssignments", () => {
+  it("should create new records for completed recurring assignments", async () => {
+    mockDB.raw
+      .mockResolvedValueOnce([
+        {
+          id: "a1",
+          course_id: "c1",
+          assigned_to_type: "user",
+          assigned_to_ids: JSON.stringify([42]),
+          recurrence_interval_days: 30,
+        },
+      ]) // recurring assignments
+      .mockResolvedValueOnce([{ last_completed: "2026-03-01T00:00:00Z" }]); // latest completion
+
+    // resolveAffectedUsers for user type
+    mockDB.findOne.mockResolvedValue(null); // no existing record for new due date
+    mockDB.deleteMany.mockResolvedValue(undefined);
+    mockDB.create.mockResolvedValue({});
+    mockDB.update.mockResolvedValue({});
+
+    const result = await processRecurringAssignments(1);
+
+    expect(result.processed_assignments).toBe(1);
+    expect(result.new_records).toBe(1);
+    expect(mockDB.create).toHaveBeenCalledWith(
+      "compliance_records",
+      expect.objectContaining({
+        assignment_id: "a1",
+        course_id: "c1",
+        user_id: 42,
+        status: "not_started",
+      })
+    );
+  });
+
+  it("should return zero when no recurring assignments need processing", async () => {
+    mockDB.raw.mockResolvedValueOnce([]); // no recurring assignments
+
+    const result = await processRecurringAssignments(1);
+
+    expect(result.processed_assignments).toBe(0);
+    expect(result.new_records).toBe(0);
   });
 });
 

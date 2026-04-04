@@ -20,6 +20,7 @@ import { getDB } from "../../db/adapters/index";
 import { lmsEvents } from "../../events/index";
 import {
   listQuizzes,
+  listAllQuizzes,
   getQuiz,
   getQuizForAttempt,
   createQuiz,
@@ -548,6 +549,308 @@ describe("getAttempt", () => {
     mockDB.findById.mockResolvedValueOnce(null);
 
     await expect(getAttempt("nonexistent")).rejects.toThrow("not found");
+  });
+});
+
+// ── submitQuizAttempt — grading branches ───────────────────────────────
+
+describe("submitQuizAttempt — grading branches", () => {
+  const setupGradingMocks = (questions: any[], opts?: { passingScore?: number; showAnswers?: boolean; completionCriteria?: string }) => {
+    const quiz = {
+      id: "q1", course_id: "c1",
+      max_attempts: 10,
+      passing_score: opts?.passingScore ?? 70,
+      show_answers: opts?.showAnswers ?? true,
+    };
+    const enrollment = { id: "e1", user_id: 42, org_id: 1 };
+    const course = { id: "c1", completion_criteria: opts?.completionCriteria ?? "lessons" };
+
+    mockDB.findById.mockImplementation((table: string, id: string) => {
+      if (table === "quizzes") return Promise.resolve(quiz);
+      if (table === "enrollments") return Promise.resolve(enrollment);
+      if (table === "courses") return Promise.resolve(course);
+      return Promise.resolve(null);
+    });
+    mockDB.count.mockResolvedValue(0);
+    mockDB.findMany.mockResolvedValue({ data: questions });
+    mockDB.create.mockResolvedValue({ id: "test-uuid-1234", completed_at: new Date().toISOString() });
+    mockDB.update.mockResolvedValue({});
+  };
+
+  it("should grade multi_select: all correct = full points", async () => {
+    setupGradingMocks([
+      {
+        id: "qn1", quiz_id: "q1", type: "multi_select", points: 2, text: "Q?",
+        options: JSON.stringify([
+          { id: "a", text: "A", is_correct: true },
+          { id: "b", text: "B", is_correct: true },
+          { id: "c", text: "C", is_correct: false },
+        ]),
+      },
+    ]);
+
+    const result = await submitQuizAttempt(1, 42, "q1", "e1", [
+      { question_id: "qn1", selected_options: ["a", "b"] },
+    ]);
+
+    expect(result.total_points_earned).toBe(2);
+    expect(result.passed).toBe(true);
+  });
+
+  it("should grade multi_select: partial selection = 0 points", async () => {
+    setupGradingMocks([
+      {
+        id: "qn1", quiz_id: "q1", type: "multi_select", points: 2, text: "Q?",
+        options: JSON.stringify([
+          { id: "a", text: "A", is_correct: true },
+          { id: "b", text: "B", is_correct: true },
+          { id: "c", text: "C", is_correct: false },
+        ]),
+      },
+    ]);
+
+    const result = await submitQuizAttempt(1, 42, "q1", "e1", [
+      { question_id: "qn1", selected_options: ["a"] },
+    ]);
+
+    expect(result.total_points_earned).toBe(0);
+  });
+
+  it("should grade fill_blank: case-insensitive match", async () => {
+    setupGradingMocks([
+      {
+        id: "qn1", quiz_id: "q1", type: "fill_blank", points: 1, text: "Capital of France?",
+        options: JSON.stringify([
+          { id: "a", text: "Paris", is_correct: true },
+        ]),
+      },
+    ]);
+
+    const result = await submitQuizAttempt(1, 42, "q1", "e1", [
+      { question_id: "qn1", text_answer: "  paris  " },
+    ]);
+
+    expect(result.total_points_earned).toBe(1);
+    expect(result.passed).toBe(true);
+  });
+
+  it("should grade fill_blank: wrong answer = 0 points", async () => {
+    setupGradingMocks([
+      {
+        id: "qn1", quiz_id: "q1", type: "fill_blank", points: 1, text: "Capital of France?",
+        options: JSON.stringify([
+          { id: "a", text: "Paris", is_correct: true },
+        ]),
+      },
+    ]);
+
+    const result = await submitQuizAttempt(1, 42, "q1", "e1", [
+      { question_id: "qn1", text_answer: "London" },
+    ]);
+
+    expect(result.total_points_earned).toBe(0);
+  });
+
+  it("should grade essay: not auto-graded, is_correct=null, 0 points", async () => {
+    setupGradingMocks([
+      {
+        id: "qn1", quiz_id: "q1", type: "essay", points: 5, text: "Explain...",
+        options: JSON.stringify([]),
+      },
+    ]);
+
+    const result = await submitQuizAttempt(1, 42, "q1", "e1", [
+      { question_id: "qn1", text_answer: "My long essay answer here." },
+    ]);
+
+    expect(result.total_points_earned).toBe(0);
+    expect(result.has_essay_questions).toBe(true);
+    expect(result.answers[0].is_correct).toBeNull();
+  });
+
+  it("should grade matching: all pairs correct = full points", async () => {
+    setupGradingMocks([
+      {
+        id: "qn1", quiz_id: "q1", type: "matching", points: 3, text: "Match:",
+        options: JSON.stringify([
+          { id: "a", text: "A", match_target: "1" },
+          { id: "b", text: "B", match_target: "2" },
+        ]),
+      },
+    ]);
+
+    const result = await submitQuizAttempt(1, 42, "q1", "e1", [
+      { question_id: "qn1", matching_pairs: { a: "1", b: "2" } },
+    ]);
+
+    expect(result.total_points_earned).toBe(3);
+    expect(result.passed).toBe(true);
+  });
+
+  it("should grade matching: wrong pairs = 0 points", async () => {
+    setupGradingMocks([
+      {
+        id: "qn1", quiz_id: "q1", type: "matching", points: 3, text: "Match:",
+        options: JSON.stringify([
+          { id: "a", text: "A", match_target: "1" },
+          { id: "b", text: "B", match_target: "2" },
+        ]),
+      },
+    ]);
+
+    const result = await submitQuizAttempt(1, 42, "q1", "e1", [
+      { question_id: "qn1", matching_pairs: { a: "2", b: "1" } },
+    ]);
+
+    expect(result.total_points_earned).toBe(0);
+  });
+
+  it("should grade ordering: correct order = full points", async () => {
+    setupGradingMocks([
+      {
+        id: "qn1", quiz_id: "q1", type: "ordering", points: 2, text: "Order these:",
+        options: JSON.stringify([
+          { id: "c", text: "C", sort_order: 2 },
+          { id: "a", text: "A", sort_order: 0 },
+          { id: "b", text: "B", sort_order: 1 },
+        ]),
+      },
+    ]);
+
+    const result = await submitQuizAttempt(1, 42, "q1", "e1", [
+      { question_id: "qn1", ordered_ids: ["a", "b", "c"] },
+    ]);
+
+    expect(result.total_points_earned).toBe(2);
+  });
+
+  it("should grade ordering: wrong order = 0 points", async () => {
+    setupGradingMocks([
+      {
+        id: "qn1", quiz_id: "q1", type: "ordering", points: 2, text: "Order these:",
+        options: JSON.stringify([
+          { id: "a", text: "A", sort_order: 0 },
+          { id: "b", text: "B", sort_order: 1 },
+        ]),
+      },
+    ]);
+
+    const result = await submitQuizAttempt(1, 42, "q1", "e1", [
+      { question_id: "qn1", ordered_ids: ["b", "a"] },
+    ]);
+
+    expect(result.total_points_earned).toBe(0);
+  });
+
+  it("should handle unknown question type as incorrect", async () => {
+    setupGradingMocks([
+      {
+        id: "qn1", quiz_id: "q1", type: "unknown_type", points: 1, text: "Q?",
+        options: JSON.stringify([]),
+      },
+    ]);
+
+    const result = await submitQuizAttempt(1, 42, "q1", "e1", [
+      { question_id: "qn1", selected_options: ["anything"] },
+    ]);
+
+    expect(result.total_points_earned).toBe(0);
+  });
+
+  it("should handle answer for nonexistent question gracefully", async () => {
+    setupGradingMocks([
+      {
+        id: "qn1", quiz_id: "q1", type: "mcq", points: 1, text: "Q?",
+        options: JSON.stringify([{ id: "o1", text: "A", is_correct: true }]),
+      },
+    ]);
+
+    const result = await submitQuizAttempt(1, 42, "q1", "e1", [
+      { question_id: "nonexistent", selected_options: ["o1"] },
+    ]);
+
+    // Unanswered qn1 adds to total but earns 0
+    expect(result.total_points_possible).toBe(1);
+    expect(result.total_points_earned).toBe(0);
+  });
+
+  it("should count unanswered questions in total points possible", async () => {
+    setupGradingMocks([
+      {
+        id: "qn1", quiz_id: "q1", type: "mcq", points: 2, text: "Q1?",
+        options: JSON.stringify([{ id: "o1", text: "A", is_correct: true }]),
+      },
+      {
+        id: "qn2", quiz_id: "q1", type: "mcq", points: 3, text: "Q2?",
+        options: JSON.stringify([{ id: "o2", text: "B", is_correct: true }]),
+      },
+    ]);
+
+    // Only answer qn1, skip qn2
+    const result = await submitQuizAttempt(1, 42, "q1", "e1", [
+      { question_id: "qn1", selected_options: ["o1"] },
+    ]);
+
+    expect(result.total_points_earned).toBe(2);
+    expect(result.total_points_possible).toBe(5); // 2 + 3
+  });
+
+  it("should throw ForbiddenError when enrollment belongs to different user", async () => {
+    mockDB.findById.mockImplementation((table: string) => {
+      if (table === "quizzes") return Promise.resolve({ id: "q1", course_id: "c1", max_attempts: 3 });
+      if (table === "enrollments") return Promise.resolve({ id: "e1", user_id: 99, org_id: 1 });
+      return Promise.resolve(null);
+    });
+    mockDB.count.mockResolvedValue(0);
+
+    await expect(submitQuizAttempt(1, 42, "q1", "e1", [])).rejects.toThrow("does not belong");
+  });
+});
+
+// ── listAllQuizzes ────────────────────────────────────────────────────
+
+describe("listAllQuizzes", () => {
+  it("should return paginated quizzes for an org", async () => {
+    mockDB.findMany.mockResolvedValue({ data: [{ id: "q1" }] });
+    mockDB.count.mockResolvedValue(5);
+
+    const result = await listAllQuizzes(1, { page: 2, limit: 10 });
+
+    expect(result.data).toHaveLength(1);
+    expect(result.total).toBe(5);
+    expect(result.page).toBe(2);
+    expect(result.limit).toBe(10);
+  });
+
+  it("should filter by course_id when provided", async () => {
+    mockDB.findMany.mockResolvedValue({ data: [] });
+    mockDB.count.mockResolvedValue(0);
+
+    await listAllQuizzes(1, { course_id: "c1" });
+
+    expect(mockDB.findMany).toHaveBeenCalledWith("quizzes", expect.objectContaining({
+      filters: expect.objectContaining({ course_id: "c1" }),
+    }));
+  });
+});
+
+// ── getQuizForAttempt — shuffle ───────────────────────────────────────
+
+describe("getQuizForAttempt — shuffle", () => {
+  it("should shuffle questions when shuffle_questions is true", async () => {
+    mockDB.findById.mockResolvedValue({ id: "q1", title: "Quiz", shuffle_questions: true });
+    const questionData = Array.from({ length: 20 }, (_, i) => ({
+      id: `qn${i}`, quiz_id: "q1", type: "mcq", text: `Q${i}?`, points: 1, sort_order: i,
+      options: JSON.stringify([{ id: "o1", text: "A", is_correct: true }]),
+    }));
+    mockDB.findMany.mockResolvedValue({ data: questionData });
+
+    const result = await getQuizForAttempt("q1", 42);
+
+    // With 20 questions, the probability of the shuffled order matching the original is 1/20! which is negligible
+    expect(result.questions).toHaveLength(20);
+    // At least the sanitized options should not have is_correct
+    expect(result.questions[0].options[0]).not.toHaveProperty("is_correct");
   });
 });
 

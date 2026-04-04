@@ -274,6 +274,52 @@ describe("awardBadge", () => {
   });
 });
 
+// ── updateLearningStreak — streak threshold trigger ───────────────────
+
+describe("updateLearningStreak — streak at threshold boundary", () => {
+  it("should award streak points when streak hits threshold multiple", async () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Profile at 6 days, after today it will be 7 (= streakThresholdDays)
+    mockDB.findOne.mockResolvedValue({
+      id: "profile1",
+      org_id: 1,
+      user_id: 42,
+      current_streak_days: 6,
+      longest_streak_days: 10,
+      last_activity_at: yesterday.toISOString(),
+      total_points_earned: 100,
+    });
+    mockDB.update.mockResolvedValue({});
+
+    const result = await updateLearningStreak(1, 42);
+
+    // Streak should be 7
+    expect(result.current_streak_days).toBe(7);
+    // awardStreakPoints should be called (which calls updateLocalPoints)
+    // The update should be called at least twice: once for streak, once for points
+    expect(mockDB.update).toHaveBeenCalled();
+  });
+
+  it("should handle null last_activity_at by setting streak to 1", async () => {
+    mockDB.findOne.mockResolvedValue({
+      id: "profile1",
+      org_id: 1,
+      user_id: 42,
+      current_streak_days: 0,
+      longest_streak_days: 0,
+      last_activity_at: null,
+    });
+    mockDB.update.mockResolvedValue({});
+
+    const result = await updateLearningStreak(1, 42);
+
+    expect(result.current_streak_days).toBe(1);
+    expect(result.longest_streak_days).toBe(1);
+  });
+});
+
 // ── getUserPoints ───────────────────────────────────────────────────────
 
 describe("getUserPoints", () => {

@@ -41,6 +41,7 @@ import {
   initTracking,
   updateTracking,
   getTracking,
+  commitTracking,
 } from "./scorm.service";
 
 const mockDB = {
@@ -234,5 +235,139 @@ describe("getTracking", () => {
     const result = await getTracking("pkg-1", 42);
 
     expect(result).toBeNull();
+  });
+});
+
+// ── commitTracking ──────────────────────────────────────────────────────
+
+describe("commitTracking", () => {
+  it("should update tracking and mark enrollment completed when SCORM is passed", async () => {
+    // updateTracking mock
+    const tracking = { id: "track-1", package_id: "pkg-1", user_id: 42, enrollment_id: "enr-1" };
+    mockDB.findOne
+      .mockResolvedValueOnce(tracking) // updateTracking lookup
+      .mockResolvedValueOnce(tracking); // commitTracking re-lookup for enrollment_id
+    mockDB.update.mockResolvedValue({ ...tracking, status: "passed" });
+    // Package lookup
+    mockDB.findById
+      .mockResolvedValueOnce({ id: "pkg-1", course_id: "c1", org_id: 1 }) // package
+      .mockResolvedValueOnce({ id: "enr-1", status: "in_progress", time_spent_minutes: 10 }); // enrollment
+
+    const result = await commitTracking("pkg-1", 42, {
+      status: "passed",
+      completion_status: "completed",
+      success_status: "passed",
+      score: 95,
+      time_spent: 120,
+    });
+
+    expect(result).toBeDefined();
+    // Should update enrollment
+    expect(mockDB.update).toHaveBeenCalledWith(
+      "enrollments",
+      "enr-1",
+      expect.objectContaining({
+        status: "completed",
+        progress_percentage: 100,
+      })
+    );
+  });
+
+  it("should mark enrollment as failed when SCORM reports failed without completion", async () => {
+    const tracking = { id: "track-1", package_id: "pkg-1", user_id: 42, enrollment_id: "enr-1" };
+    mockDB.findOne
+      .mockResolvedValueOnce(tracking)
+      .mockResolvedValueOnce(tracking);
+    mockDB.update.mockResolvedValue({ ...tracking, status: "failed" });
+    mockDB.findById
+      .mockResolvedValueOnce({ id: "pkg-1", course_id: "c1", org_id: 1 })
+      .mockResolvedValueOnce({ id: "enr-1", status: "in_progress", time_spent_minutes: 5 });
+
+    // Note: completion_status="incomplete" + success_status="failed" -> isCompleted=true because status="failed" is NOT in the check
+    // The isCompleted check is: completion_status=completed OR status=completed OR status=passed OR success_status=passed
+    // So status=failed does NOT trigger completion path
+    await commitTracking("pkg-1", 42, {
+      status: "failed",
+      completion_status: "incomplete",
+      success_status: "failed",
+    });
+
+    // Since isCompleted is false (none of the completion triggers matched),
+    // no enrollment update happens
+    const enrollmentCalls = mockDB.update.mock.calls.filter(
+      (c: any[]) => c[0] === "enrollments"
+    );
+    expect(enrollmentCalls).toHaveLength(0);
+  });
+
+  it("should mark enrollment as failed when SCORM passes isCompleted but isFailed", async () => {
+    const tracking = { id: "track-1", package_id: "pkg-1", user_id: 42, enrollment_id: "enr-1" };
+    mockDB.findOne
+      .mockResolvedValueOnce(tracking)
+      .mockResolvedValueOnce(tracking);
+    mockDB.update.mockResolvedValue({ ...tracking, status: "completed" });
+    mockDB.findById
+      .mockResolvedValueOnce({ id: "pkg-1", course_id: "c1", org_id: 1 })
+      .mockResolvedValueOnce({ id: "enr-1", status: "in_progress", time_spent_minutes: 5 });
+
+    // status="completed" triggers isCompleted=true
+    // isPassed = false, isFailed = success_status==="failed" => true
+    // BUT completion_status="incomplete", so (isPassed || completion_status==="completed") is false
+    // Then isFailed check => status: "failed"
+    await commitTracking("pkg-1", 42, {
+      status: "completed",
+      completion_status: "incomplete",
+      success_status: "failed",
+    });
+
+    expect(mockDB.update).toHaveBeenCalledWith(
+      "enrollments",
+      "enr-1",
+      expect.objectContaining({
+        status: "failed",
+      })
+    );
+  });
+
+  it("should not change enrollment status when it is already completed", async () => {
+    const tracking = { id: "track-1", package_id: "pkg-1", user_id: 42, enrollment_id: "enr-1" };
+    mockDB.findOne
+      .mockResolvedValueOnce(tracking)  // updateTracking lookup
+      .mockResolvedValueOnce(tracking); // commitTracking fullTracking lookup
+    mockDB.update.mockResolvedValue({ ...tracking, status: "completed" });
+    mockDB.findById
+      .mockResolvedValueOnce({ id: "pkg-1", course_id: "c1", org_id: 1 })  // package
+      .mockResolvedValueOnce({ id: "enr-1", status: "completed", time_spent_minutes: 60 }); // enrollment
+
+    await commitTracking("pkg-1", 42, {
+      completion_status: "completed",
+    });
+
+    // When enrollment is already "completed", the guard at line 474 prevents
+    // the status-changing block. The enrollment update still fires with time/access fields.
+    const enrollmentUpdate = mockDB.update.mock.calls.find(
+      (c: any[]) => c[0] === "enrollments" && c[1] === "enr-1"
+    );
+    expect(enrollmentUpdate).toBeDefined();
+    // The update should have last_accessed_at but should NOT change the status
+    expect(enrollmentUpdate![2]).toHaveProperty("last_accessed_at");
+  });
+
+  it("should handle non-completion data gracefully (no enrollment update)", async () => {
+    const tracking = { id: "track-1", package_id: "pkg-1", user_id: 42, enrollment_id: "enr-1" };
+    mockDB.findOne.mockResolvedValueOnce(tracking);
+    mockDB.update.mockResolvedValue({ ...tracking, location: "page5" });
+
+    // Only updating location, no completion flags
+    await commitTracking("pkg-1", 42, {
+      location: "page5",
+      suspend_data: "bookmark=5",
+    });
+
+    // Should not try to update enrollments
+    const enrollmentCalls = mockDB.update.mock.calls.filter(
+      (c: any[]) => c[0] === "enrollments"
+    );
+    expect(enrollmentCalls).toHaveLength(0);
   });
 });

@@ -296,6 +296,58 @@ describe("updateSession", () => {
       "Cannot update"
     );
   });
+
+  it("should throw BadRequestError for invalid start_time format", async () => {
+    mockDB.findOne.mockResolvedValue({
+      id: "s1", title: "Session", status: "scheduled", org_id: 1,
+      start_time: "2026-06-01T09:00:00Z", end_time: "2026-06-01T11:00:00Z",
+    });
+
+    await expect(updateSession(1, "s1", { start_time: "not-a-date" })).rejects.toThrow("Invalid start_time");
+  });
+
+  it("should throw BadRequestError for invalid end_time format", async () => {
+    mockDB.findOne.mockResolvedValue({
+      id: "s1", title: "Session", status: "scheduled", org_id: 1,
+      start_time: "2026-06-01T09:00:00Z", end_time: "2026-06-01T11:00:00Z",
+    });
+
+    await expect(updateSession(1, "s1", { end_time: "not-a-date" })).rejects.toThrow("Invalid end_time");
+  });
+
+  it("should throw BadRequestError when updated end_time is before start_time", async () => {
+    mockDB.findOne.mockResolvedValue({
+      id: "s1", title: "Session", status: "scheduled", org_id: 1,
+      start_time: "2026-06-01T09:00:00Z", end_time: "2026-06-01T11:00:00Z",
+    });
+
+    await expect(updateSession(1, "s1", {
+      start_time: "2026-06-01T12:00:00Z",
+      end_time: "2026-06-01T10:00:00Z",
+    })).rejects.toThrow("after start_time");
+  });
+
+  it("should return session unchanged when no update data provided", async () => {
+    const session = {
+      id: "s1", title: "Session", status: "scheduled", org_id: 1,
+      start_time: "2026-06-01T09:00:00Z", end_time: "2026-06-01T11:00:00Z",
+    };
+    mockDB.findOne.mockResolvedValue(session);
+
+    const result = await updateSession(1, "s1", {});
+    expect(result).toEqual(session);
+    expect(mockDB.update).not.toHaveBeenCalled();
+  });
+
+  it("should validate instructor exists when changing instructor_id", async () => {
+    mockDB.findOne.mockResolvedValue({
+      id: "s1", status: "scheduled", org_id: 1,
+      start_time: "2026-06-01T09:00:00Z", end_time: "2026-06-01T11:00:00Z",
+    });
+    (findUserById as any).mockResolvedValue(null);
+
+    await expect(updateSession(1, "s1", { instructor_id: 999 })).rejects.toThrow("not found");
+  });
 });
 
 // ── cancelSession ───────────────────────────────────────────────────────
@@ -342,6 +394,14 @@ describe("completeSession", () => {
 
     const result = await completeSession(1, "s1");
 
+    expect(result.status).toBe("completed");
+  });
+
+  it("should complete an in_progress session", async () => {
+    mockDB.findOne.mockResolvedValue({ id: "s1", status: "in_progress", org_id: 1 });
+    mockDB.update.mockResolvedValue({ id: "s1", status: "completed" });
+
+    const result = await completeSession(1, "s1");
     expect(result.status).toBe("completed");
   });
 
@@ -479,6 +539,20 @@ describe("registerBulk", () => {
     });
 
     await expect(registerBulk(1, "s1", [42, 43, 44])).rejects.toThrow("capacity");
+  });
+
+  it("should skip users not found in org", async () => {
+    mockDB.findOne
+      .mockResolvedValueOnce({ id: "s1", status: "scheduled", max_attendees: 50, enrolled_count: 0, org_id: 1 })
+      .mockResolvedValueOnce(null); // user 42 not registered
+    (findUserById as any).mockResolvedValueOnce(null); // user not found
+    mockDB.update.mockResolvedValue({});
+
+    const result = await registerBulk(1, "s1", [42]);
+
+    expect(result.registered_count).toBe(0);
+    expect(result.results[0].status).toBe("skipped");
+    expect(result.results[0].error).toBe("User not found");
   });
 
   it("should throw BadRequestError with empty userIds", async () => {
