@@ -550,7 +550,7 @@ describe("Certification Service (real DB)", () => {
 
     const cert = await db("certificates").where({ id: certId }).first();
     expect(cert.status).toBe("revoked");
-    const meta = JSON.parse(cert.metadata);
+    const meta = typeof cert.metadata === "string" ? JSON.parse(cert.metadata) : cert.metadata;
     expect(meta.revocation_reason).toBe("Test revocation");
   });
 
@@ -637,6 +637,9 @@ describe("Gamification Service (real DB)", () => {
     const user = await getRealUser();
     const profileId = uuidv4();
     const now = new Date();
+
+    // Delete any existing profile for this user to avoid unique constraint violation
+    await db("user_learning_profiles").where({ org_id: user.org_id, user_id: user.id }).del();
 
     await db("user_learning_profiles").insert({
       id: profileId,
@@ -781,7 +784,7 @@ describe("Enrollment Service (real DB)", () => {
     const enrollment = await db("enrollments").where({ id: enrollmentId }).first();
     expect(enrollment).toBeTruthy();
     expect(enrollment.status).toBe("enrolled");
-    expect(enrollment.progress_percentage).toBe(0);
+    expect(parseFloat(enrollment.progress_percentage)).toBe(0);
     expect(enrollment.user_id).toBe(user.id);
     expect(enrollment.course_id).toBe(courseId);
   });
@@ -828,7 +831,7 @@ describe("Enrollment Service (real DB)", () => {
 
     const enrollment = await db("enrollments").where({ id: enrollmentId }).first();
     expect(enrollment.status).toBe("completed");
-    expect(enrollment.progress_percentage).toBe(100);
+    expect(parseFloat(enrollment.progress_percentage)).toBe(100);
     expect(enrollment.completed_at).toBeTruthy();
   });
 
@@ -1167,7 +1170,8 @@ describe("Lesson Service (real DB)", () => {
 
     const previews = await db("lessons as l")
       .join("course_modules as m", "m.id", "l.module_id")
-      .where({ "m.course_id": courseId, "l.is_preview": true });
+      .where({ "m.course_id": courseId, "l.is_preview": true })
+      .select("l.*");
 
     expect(previews.length).toBe(1);
     expect(previews[0].title).toBe("Preview Lesson");
@@ -1407,7 +1411,6 @@ describe("Quiz Service (real DB)", () => {
 
     await db("quizzes").insert({
       id: quizId,
-      org_id: user.org_id,
       course_id: courseId,
       module_id: null,
       title: `Test Quiz ${Date.now()}`,
@@ -1439,7 +1442,6 @@ describe("Quiz Service (real DB)", () => {
 
     await db("quizzes").insert({
       id: quizId,
-      org_id: user.org_id,
       course_id: courseId,
       title: "MCQ Quiz",
       type: "graded",
@@ -1476,7 +1478,7 @@ describe("Quiz Service (real DB)", () => {
     const question = await db("questions").where({ id: qId }).first();
     expect(question).toBeTruthy();
     expect(question.type).toBe("mcq");
-    const parsedOptions = JSON.parse(question.options);
+    const parsedOptions = typeof question.options === "string" ? JSON.parse(question.options) : question.options;
     expect(parsedOptions.length).toBe(3);
     expect(parsedOptions[0].is_correct).toBe(true);
   });
@@ -1490,7 +1492,6 @@ describe("Quiz Service (real DB)", () => {
 
     await db("quizzes").insert({
       id: quizId,
-      org_id: user.org_id,
       course_id: courseId,
       title: "Attempt Quiz",
       type: "graded",
@@ -1536,7 +1537,6 @@ describe("Quiz Service (real DB)", () => {
 
     await db("quizzes").insert({
       id: quizId,
-      org_id: user.org_id,
       course_id: courseId,
       title: "Stats Quiz",
       type: "graded",
@@ -1578,7 +1578,6 @@ describe("Quiz Service (real DB)", () => {
 
     await db("quizzes").insert({
       id: quizId,
-      org_id: user.org_id,
       course_id: courseId,
       title: "Delete Quiz",
       type: "practice",
@@ -1604,7 +1603,6 @@ describe("Quiz Service (real DB)", () => {
 
     await db("quizzes").insert({
       id: quizId,
-      org_id: user.org_id,
       course_id: courseId,
       title: "Reorder Quiz",
       type: "graded",
