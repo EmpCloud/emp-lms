@@ -88,6 +88,7 @@ async function getRealUser(): Promise<{ id: number; org_id: number; first_name: 
 async function createTestCourse(orgId: number): Promise<string> {
   const id = uuidv4();
   const now = new Date();
+  const user = await getRealUser();
   await db("courses").insert({
     id,
     org_id: orgId,
@@ -107,6 +108,7 @@ async function createTestCourse(orgId: number): Promise<string> {
     certificate_template_id: null,
     is_featured: false,
     published_at: now,
+    created_by: user.id,
     created_at: now,
     updated_at: now,
   });
