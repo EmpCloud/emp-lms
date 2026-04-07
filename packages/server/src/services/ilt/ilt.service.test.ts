@@ -59,6 +59,9 @@ const mockDB = {
 beforeEach(() => {
   vi.clearAllMocks();
   (getDB as any).mockReturnValue(mockDB);
+  mockDB.transaction.mockImplementation((fn: any) => fn(mockDB));
+  // Reset findUserById to prevent mock leaking between tests
+  (findUserById as any).mockReset();
 });
 
 // ── listSessions ────────────────────────────────────────────────────────
@@ -425,7 +428,7 @@ describe("registerUser", () => {
     mockDB.findOne
       .mockResolvedValueOnce({ id: "s1", status: "scheduled", max_attendees: 20, enrolled_count: 5, org_id: 1 })
       .mockResolvedValueOnce(null); // no existing registration
-    (findUserById as any).mockResolvedValue({ id: 42, organization_id: 1 });
+    (findUserById as any).mockResolvedValue({ id: 42, org_id: 1 });
     mockDB.create.mockResolvedValue({
       id: "test-uuid-1234",
       session_id: "s1",
@@ -506,8 +509,8 @@ describe("registerBulk", () => {
       .mockResolvedValueOnce(null) // user 42 not registered
       .mockResolvedValueOnce(null); // user 43 not registered
     (findUserById as any)
-      .mockResolvedValueOnce({ id: 42, organization_id: 1 })
-      .mockResolvedValueOnce({ id: 43, organization_id: 1 });
+      .mockResolvedValueOnce({ id: 42, org_id: 1 })
+      .mockResolvedValueOnce({ id: 43, org_id: 1 });
     mockDB.create.mockResolvedValue({});
     mockDB.update.mockResolvedValue({});
 

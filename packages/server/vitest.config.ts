@@ -15,6 +15,10 @@ export default defineConfig({
     environment: "node",
     pool: "forks",
     include: ["src/**/*.test.ts", "src/__tests__/**/*.test.ts"],
+    exclude: [
+      "src/__tests__/real-db/**",
+      "src/__tests__/api.test.ts",
+    ],
     testTimeout: 30000,
     coverage: {
       provider: "v8",

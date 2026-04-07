@@ -114,7 +114,7 @@ describe("createCategory", () => {
 
     expect(mockDB.create).toHaveBeenCalledWith("course_categories", expect.objectContaining({
       id: "test-uuid-1234",
-      organization_id: 1,
+      org_id: 1,
       name: "New Category",
       slug: "new-category",
     }));
@@ -260,7 +260,7 @@ describe("deleteCategory", () => {
 
     expect(mockDB.updateMany).toHaveBeenCalledWith(
       "course_categories",
-      { parent_id: "cat-1", organization_id: 1 },
+      { parent_id: "cat-1", org_id: 1 },
       { parent_id: "parent-1" }
     );
   });

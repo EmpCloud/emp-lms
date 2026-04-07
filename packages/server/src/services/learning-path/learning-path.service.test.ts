@@ -60,6 +60,9 @@ const mockDB = {
 beforeEach(() => {
   vi.clearAllMocks();
   (getDB as any).mockReturnValue(mockDB);
+  mockDB.transaction.mockImplementation((fn: any) => fn(mockDB));
+  // Reset findUserById to prevent mock leaking between tests
+  (findUserById as any).mockReset();
 });
 
 // ── listLearningPaths ─────────────────────────────────────────────────────
@@ -447,9 +450,9 @@ describe("enrollUser", () => {
     mockDB.findOne
       .mockResolvedValueOnce({ id: "lp1", org_id: 1, status: "published" }) // path
       .mockResolvedValueOnce(null); // no existing enrollment
-    (findUserById as any).mockResolvedValue({
+    (findUserById as any).mockResolvedValueOnce({
       id: 42,
-      organization_id: 1,
+      org_id: 1,
       first_name: "John",
       last_name: "Doe",
     });
@@ -476,9 +479,9 @@ describe("enrollUser", () => {
     mockDB.findOne
       .mockResolvedValueOnce({ id: "lp1", org_id: 1, status: "published" }) // path
       .mockResolvedValueOnce({ id: "existing-enrollment" }); // already enrolled
-    (findUserById as any).mockResolvedValue({
+    (findUserById as any).mockResolvedValueOnce({
       id: 42,
-      organization_id: 1,
+      org_id: 1,
     });
 
     await expect(enrollUser(1, 42, "lp1")).rejects.toThrow("already enrolled");
