@@ -672,7 +672,7 @@ describe("learning-path.service — uncovered functions", () => {
       .mockResolvedValueOnce(null) // not already enrolled
       .mockResolvedValueOnce(null) // course enrollment check 1
       .mockResolvedValueOnce(null); // course enrollment check 2
-    (findUserById as any).mockResolvedValue({ id: 42, org_id: 1 });
+    (findUserById as any).mockResolvedValue({ id: 42, organization_id: 1 });
     mockDB.create.mockResolvedValue({ id: "enrollment-1" });
     mockDB.raw.mockResolvedValue([
       { course_id: "c1" },
@@ -693,7 +693,7 @@ describe("learning-path.service — uncovered functions", () => {
       .mockResolvedValueOnce({ id: "p1", org_id: 1, status: "published" }) // path
       .mockResolvedValueOnce(null) // not already enrolled in path
       .mockResolvedValueOnce({ id: "existing-enroll" }); // already enrolled in course
-    (findUserById as any).mockResolvedValue({ id: 42, org_id: 1 });
+    (findUserById as any).mockResolvedValue({ id: 42, organization_id: 1 });
     mockDB.create.mockResolvedValue({ id: "enrollment-1" });
     mockDB.raw.mockResolvedValue([{ course_id: "c1" }]); // path courses
 
@@ -709,7 +709,7 @@ describe("learning-path.service — uncovered functions", () => {
     const { findUserById } = await import("../../db/empcloud");
 
     mockDB.findOne.mockResolvedValueOnce({ id: "p1", org_id: 1, status: "published" });
-    (findUserById as any).mockResolvedValue({ id: 42, org_id: 999 }); // wrong org
+    (findUserById as any).mockResolvedValue({ id: 42, organization_id: 999 }); // wrong org
 
     await expect(enrollUser(1, 42, "p1")).rejects.toThrow();
   });

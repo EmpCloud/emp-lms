@@ -452,7 +452,7 @@ describe("enrollUser", () => {
       .mockResolvedValueOnce(null); // no existing enrollment
     (findUserById as any).mockResolvedValueOnce({
       id: 42,
-      org_id: 1,
+      organization_id: 1,
       first_name: "John",
       last_name: "Doe",
     });
@@ -481,7 +481,7 @@ describe("enrollUser", () => {
       .mockResolvedValueOnce({ id: "existing-enrollment" }); // already enrolled
     (findUserById as any).mockResolvedValueOnce({
       id: 42,
-      org_id: 1,
+      organization_id: 1,
     });
 
     await expect(enrollUser(1, 42, "lp1")).rejects.toThrow("already enrolled");
