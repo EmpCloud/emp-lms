@@ -1,5 +1,9 @@
 import { defineConfig } from "vitest/config";
 import { resolve } from "path";
+import dotenv from "dotenv";
+
+// Load .env from project root so DB_PASSWORD and other secrets are available
+dotenv.config({ path: resolve(__dirname, "../../.env") });
 
 export default defineConfig({
   resolve: {
