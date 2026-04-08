@@ -15,7 +15,7 @@ const ids: { table: string; id: string }[] = [];
 function track(table: string, id: string) { ids.push({ table, id }); }
 
 beforeAll(async () => {
-  db = knex({ client: "mysql2", connection: { host: "localhost", port: 3306, user: "empcloud", password: "EmpCloud2026", database: "emp_lms" }, pool: { min: 1, max: 5 } });
+  db = knex({ client: "mysql2", connection: { host: "localhost", port: 3306, user: "empcloud", password: process.env.DB_PASSWORD || "", database: "emp_lms" }, pool: { min: 1, max: 5 } });
   await db.raw("SELECT 1");
 });
 afterEach(async () => {

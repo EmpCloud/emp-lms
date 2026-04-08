@@ -11,7 +11,7 @@ vi.hoisted(() => {
   process.env.DB_HOST = "localhost";
   process.env.DB_PORT = "3306";
   process.env.DB_USER = "empcloud";
-  process.env.DB_PASSWORD = "EmpCloud2026";
+  process.env.DB_PASSWORD = process.env.DB_PASSWORD || "";
   process.env.DB_NAME = "emp_lms";
   process.env.DB_POOL_MIN = "1";
   process.env.DB_POOL_MAX = "5";
@@ -20,7 +20,7 @@ vi.hoisted(() => {
   process.env.EMPCLOUD_DB_HOST = "localhost";
   process.env.EMPCLOUD_DB_PORT = "3306";
   process.env.EMPCLOUD_DB_USER = "empcloud";
-  process.env.EMPCLOUD_DB_PASSWORD = "EmpCloud2026";
+  process.env.EMPCLOUD_DB_PASSWORD = process.env.EMPCLOUD_DB_PASSWORD || "";
   process.env.EMPCLOUD_DB_NAME = "empcloud";
 });
 
