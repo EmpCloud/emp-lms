@@ -1,4 +1,4 @@
-import { Knex } from "knex";
+import type { Knex } from "knex";
 
 const DIFFICULTY_LEVELS = ["beginner", "intermediate", "advanced", "expert"];
 const COURSE_STATUSES = ["draft", "published", "archived"];

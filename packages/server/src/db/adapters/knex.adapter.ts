@@ -2,7 +2,8 @@
 // KNEX SQL ADAPTER — supports MySQL, PostgreSQL, SQLite
 // ============================================================================
 
-import knex, { Knex } from "knex";
+import knex from "knex";
+import type { Knex } from "knex";
 import { v4 as uuidv4 } from "uuid";
 import { IDBAdapter, QueryOptions, QueryResult, TransactionContext } from "./interface";
 

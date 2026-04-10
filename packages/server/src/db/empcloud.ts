@@ -4,7 +4,8 @@
 // Used for authentication, user lookups, and org data.
 // ============================================================================
 
-import knex, { Knex } from "knex";
+import knex from "knex";
+import type { Knex } from "knex";
 import { config } from "../config";
 import { logger } from "../utils/logger";
 
