@@ -93,7 +93,7 @@ export async function listAllQuizzes(
     filters,
     sort: { field: "created_at", order: "desc" },
     limit,
-    offset: (page - 1) * limit,
+    page,
   });
   const total = await db.count("quizzes", filters);
   return { data: result.data, total, page, limit };
