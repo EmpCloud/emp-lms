@@ -8,7 +8,7 @@ import * as discussionService from "../../services/discussion/discussion.service
 import { sendSuccess, sendPaginated } from "../../utils/response";
 import { authenticate, authorize } from "../middleware/auth.middleware";
 import { validateBody } from "../middleware/validate.middleware";
-import { createDiscussionSchema } from "@emp-lms/shared/validators";
+import { createDiscussionSchema } from "@emp-lms/shared";
 
 const router = Router();
 

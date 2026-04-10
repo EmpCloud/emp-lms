@@ -9,7 +9,7 @@ import { getDB } from "../../db/adapters/index";
 import { sendSuccess, sendPaginated } from "../../utils/response";
 import { authenticate, authorize } from "../middleware/auth.middleware";
 import { validateBody } from "../middleware/validate.middleware";
-import { createCourseRatingSchema } from "@emp-lms/shared/validators";
+import { createCourseRatingSchema } from "@emp-lms/shared";
 import { NotFoundError, ConflictError } from "../../utils/errors";
 
 const router = Router();
