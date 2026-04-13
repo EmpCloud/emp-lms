@@ -196,14 +196,6 @@ export default function LoginPage() {
               </button>
             </form>
           </div>
-
-          {/* Demo hint */}
-          <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-center text-xs text-blue-700">
-            <p className="font-medium">Demo credentials</p>
-            <p className="mt-0.5">
-              admin@demo.com / demo1234 &mdash; learner@demo.com / demo1234
-            </p>
-          </div>
         </div>
       </div>
     </div>
