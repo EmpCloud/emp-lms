@@ -4,7 +4,7 @@ dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
 
 export const config = {
   env: process.env.NODE_ENV || "development",
-  port: parseInt(process.env.PORT || "4700"),
+  port: parseInt(process.env.PORT || "6021"),
   host: process.env.HOST || "0.0.0.0",
 
   // LMS module database (lms-specific tables only)

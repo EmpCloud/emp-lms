@@ -104,12 +104,12 @@ pnpm run db:migrate
 pnpm run db:seed
 
 # 6. Start development
-pnpm run dev           # Server on :4700, Client on :5183
+pnpm run dev           # Server on :6021, Client on :5183
 ```
 
 Once running, visit:
 - **Client**: http://localhost:5183
-- **API**: http://localhost:4700
+- **API**: http://localhost:6021
 - **Mailpit**: http://localhost:8025
 
 ### Scripts
@@ -138,7 +138,7 @@ docker build -t emp-lms-client packages/client
 docker compose up -d
 ```
 
-Server: Node 20 Alpine + Chromium (for Puppeteer PDF generation), port 4700.
+Server: Node 20 Alpine + Chromium (for Puppeteer PDF generation), port 6021.
 Client: Nginx Alpine serving Vite build, port 80 with SPA routing.
 
 ---
@@ -153,7 +153,7 @@ emp-lms/
         types/           # TypeScript interfaces & enums
         validators/      # Zod schemas (shared client + server)
         constants/       # Course statuses, question types, permissions
-    server/              # @emp-lms/server (port 4700)
+    server/              # @emp-lms/server (port 6021)
       src/
         api/
           routes/        # 18 route modules
@@ -200,7 +200,7 @@ emp-lms/
 
 ## API Endpoints
 
-All endpoints under `/api/v1/`. Server runs on port **4700**.
+All endpoints under `/api/v1/`. Server runs on port **6021**.
 
 ### Authentication
 
@@ -402,7 +402,7 @@ See [`.env.example`](.env.example) for all variables. Key ones:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `4700` | Server port |
+| `PORT` | `6021` | Server port |
 | `DB_HOST` | `localhost` | MySQL host |
 | `DB_NAME` | `emp_lms` | Database name |
 | `EMPCLOUD_DB_NAME` | `empcloud` | EmpCloud master DB (users, orgs) |
