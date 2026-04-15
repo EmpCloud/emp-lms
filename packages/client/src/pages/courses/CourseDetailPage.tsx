@@ -15,7 +15,11 @@ import {
   MessageSquare,
   ShieldCheck,
   ArrowLeft,
+  Settings,
+  Upload,
+  Archive,
 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import {
   useCourse,
@@ -24,6 +28,8 @@ import {
   useDiscussions,
   useRatings,
 } from "@/api/hooks";
+import { apiPost } from "@/api/client";
+import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 import { formatDuration, formatDate, cn, progressColor } from "@/lib/utils";
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
@@ -183,10 +189,37 @@ function DetailSkeleton() {
 /* ── Main Page ───────────────────────────────────────────────────────────── */
 export default function CourseDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const currentUser = useAuthStore((s) => s.user);
+  const isAdmin = isAdminRole(currentUser?.role);
+  const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("Modules & Lessons");
 
   const { data: courseRes, isLoading } = useCourse(id!);
   const enroll = useEnroll();
+
+  const publishCourse = useMutation({
+    mutationFn: () => apiPost(`/courses/${id}/publish`, {}),
+    onSuccess: () => {
+      toast.success("Course published");
+      qc.invalidateQueries({ queryKey: ["course", id] });
+      qc.invalidateQueries({ queryKey: ["courses"] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error?.message || "Failed to publish");
+    },
+  });
+
+  const unpublishCourse = useMutation({
+    mutationFn: () => apiPost(`/courses/${id}/unpublish`, {}),
+    onSuccess: () => {
+      toast.success("Course unpublished");
+      qc.invalidateQueries({ queryKey: ["course", id] });
+      qc.invalidateQueries({ queryKey: ["courses"] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.error?.message || "Failed to unpublish");
+    },
+  });
   const { data: quizzesRes } = useQuizzes(id!);
   const { data: discussionsRes } = useDiscussions(id!);
   const { data: ratingsRes } = useRatings(id!);
@@ -201,11 +234,18 @@ export default function CourseDetailPage() {
   const modules: any[] = course?.modules ?? [];
 
   function handleEnroll() {
+    if (!id || !currentUser?.empcloudUserId) {
+      toast.error("You must be logged in to enroll.");
+      return;
+    }
     enroll.mutate(
-      { courseId: id },
+      { user_id: currentUser.empcloudUserId, course_id: id },
       {
         onSuccess: () => toast.success("Enrolled successfully!"),
-        onError: () => toast.error("Failed to enroll. Please try again."),
+        onError: (err: any) => {
+          const msg = err?.response?.data?.error?.message || "Failed to enroll. Please try again.";
+          toast.error(msg);
+        },
       },
     );
   }
@@ -332,6 +372,46 @@ export default function CourseDetailPage() {
               >
                 {enroll.isPending ? "Enrolling..." : "Enroll Now"}
               </button>
+            )}
+
+            {/* Admin actions */}
+            {isAdmin && (
+              <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                <p className="text-xs font-medium uppercase text-gray-400">Admin</p>
+                <Link
+                  to={`/courses/${id}/builder`}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                >
+                  <Settings className="h-4 w-4" />
+                  Manage Content
+                </Link>
+                {course?.status === "published" ? (
+                  <button
+                    type="button"
+                    onClick={() => unpublishCourse.mutate()}
+                    disabled={unpublishCourse.isPending}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    <Archive className="h-4 w-4" />
+                    {unpublishCourse.isPending ? "Unpublishing..." : "Unpublish"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => publishCourse.mutate()}
+                    disabled={publishCourse.isPending}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm font-medium text-green-700 transition hover:bg-green-100 disabled:opacity-50"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {publishCourse.isPending ? "Publishing..." : "Publish Course"}
+                  </button>
+                )}
+                {course?.status && (
+                  <p className="text-center text-xs text-gray-400">
+                    Status: <span className="font-medium capitalize">{course.status}</span>
+                  </p>
+                )}
+              </div>
             )}
 
             {/* Stats */}

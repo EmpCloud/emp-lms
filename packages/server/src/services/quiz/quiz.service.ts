@@ -82,13 +82,37 @@ export async function listAllQuizzes(
   orgId: number,
   options?: { page?: number; limit?: number; course_id?: string }
 ) {
+  // The `quizzes` table does not carry an `org_id` column — tenancy is
+  // enforced through the parent course. If a specific course is requested,
+  // verify it belongs to the org, then list its quizzes. Otherwise, fetch
+  // the org's courses first and filter quizzes by those ids.
   const db = getDB();
-  const filters: Record<string, any> = { org_id: orgId };
-  if (options?.course_id) {
-    filters.course_id = options.course_id;
-  }
   const page = options?.page || 1;
   const limit = options?.limit || 50;
+
+  const filters: Record<string, any> = {};
+  if (options?.course_id) {
+    const course = await db.findOne<any>("courses", {
+      id: options.course_id,
+      org_id: orgId,
+    });
+    if (!course) {
+      return { data: [], total: 0, page, limit };
+    }
+    filters.course_id = options.course_id;
+  } else {
+    const orgCourses = await db.findMany<any>("courses", {
+      filters: { org_id: orgId },
+      limit: 10000,
+      page: 1,
+    });
+    const courseIds = (orgCourses.data ?? []).map((c: any) => c.id);
+    if (courseIds.length === 0) {
+      return { data: [], total: 0, page, limit };
+    }
+    filters.course_id = courseIds;
+  }
+
   const result = await db.findMany<any>("quizzes", {
     filters,
     sort: { field: "created_at", order: "desc" },

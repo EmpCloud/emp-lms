@@ -9,10 +9,13 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 // ---------- Lazy-loaded pages ----------
 const LoginPage = lazy(() => import("@/pages/auth/LoginPage"));
 const DashboardPage = lazy(() => import("@/pages/dashboard/DashboardPage"));
-const CourseCatalogPage = lazy(() => import("@/pages/courses/CourseCatalogPage"));
-const CourseCreatePage = lazy(() => import("@/pages/courses/CourseCreatePage"));
+// CourseListPage is the real admin-aware catalog (renders the "Create Course"
+// button for admins). CourseFormPage is the real create/edit form that
+// switches modes based on the :id route param. The old stub pages
+// (CourseCatalogPage, CourseCreatePage, CourseEditPage) have been retired.
+const CourseListPage = lazy(() => import("@/pages/courses/CourseListPage"));
+const CourseFormPage = lazy(() => import("@/pages/courses/CourseFormPage"));
 const CourseDetailPage = lazy(() => import("@/pages/courses/CourseDetailPage"));
-const CourseEditPage = lazy(() => import("@/pages/courses/CourseEditPage"));
 const CourseBuilderPage = lazy(() => import("@/pages/courses/CourseBuilderPage"));
 const MyLearningPage = lazy(() => import("@/pages/courses/MyLearningPage"));
 const LearningPathsPage = lazy(() => import("@/pages/learning-paths/LearningPathsPage"));
@@ -148,10 +151,10 @@ export default function App() {
             }
           >
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/courses" element={<CourseCatalogPage />} />
-            <Route path="/courses/new" element={<CourseCreatePage />} />
+            <Route path="/courses" element={<CourseListPage />} />
+            <Route path="/courses/new" element={<CourseFormPage />} />
             <Route path="/courses/:id" element={<CourseDetailPage />} />
-            <Route path="/courses/:id/edit" element={<CourseEditPage />} />
+            <Route path="/courses/:id/edit" element={<CourseFormPage />} />
             <Route path="/courses/:id/builder" element={<CourseBuilderPage />} />
             <Route path="/my-learning" element={<MyLearningPage />} />
             <Route path="/learning-paths" element={<LearningPathsPage />} />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { GraduationCap, Eye, EyeOff, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -40,9 +40,11 @@ export default function LoginPage() {
   const login = useAuthStore((s) => s.login);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
-  // Redirect if already logged in
+  // Redirect if already logged in. Use <Navigate> instead of calling
+  // navigate() during render, which would setState on BrowserRouter mid-render
+  // and trigger a React warning.
   if (isAuthenticated) {
-    navigate("/dashboard", { replace: true });
+    return <Navigate to="/dashboard" replace />;
   }
 
   const mutation = useMutation({

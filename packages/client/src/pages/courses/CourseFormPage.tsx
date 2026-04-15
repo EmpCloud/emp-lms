@@ -1,11 +1,12 @@
 import { useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import toast from "react-hot-toast";
 import { BookOpen, ArrowLeft, Save, Loader2 } from "lucide-react";
 import { useCourse, useCreateCourse, useUpdateCourse, useCategories } from "@/api/hooks";
+import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
 
 /* ── Schema ──────────────────────────────────────────────────────────────── */
@@ -13,7 +14,7 @@ const courseSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters").max(200),
   description: z.string().min(10, "Description must be at least 10 characters"),
   short_description: z.string().max(300).optional().or(z.literal("")),
-  category: z.string().min(1, "Category is required"),
+  category_id: z.string().min(1, "Category is required"),
   difficulty: z.enum(["beginner", "intermediate", "advanced"], {
     required_error: "Difficulty is required",
   }),
@@ -66,6 +67,15 @@ export default function CourseFormPage() {
   const navigate = useNavigate();
   const isEdit = !!id;
 
+  // Gate the entire page to admin roles. Non-admins who land here via a
+  // stray URL are redirected back to the catalog. The server-side middleware
+  // also rejects the create/update POST, but this keeps the form from
+  // flashing into view for employees at all.
+  const currentUser = useAuthStore((s) => s.user);
+  if (!isAdminRole(currentUser?.role)) {
+    return <Navigate to="/courses" replace />;
+  }
+
   const { data: courseRes, isLoading: courseLoading } = useCourse(id ?? "");
   const { data: categoriesRes } = useCategories();
   const createCourse = useCreateCourse();
@@ -85,7 +95,7 @@ export default function CourseFormPage() {
       title: "",
       description: "",
       short_description: "",
-      category: "",
+      category_id: "",
       difficulty: undefined,
       duration: 0,
       is_mandatory: false,
@@ -104,11 +114,11 @@ export default function CourseFormPage() {
         title: c.title ?? "",
         description: c.description ?? "",
         short_description: c.shortDescription ?? c.short_description ?? "",
-        category: c.category ?? "",
+        category_id: c.categoryId ?? c.category_id ?? "",
         difficulty: c.difficulty ?? "beginner",
         duration: c.duration ?? 0,
-        is_mandatory: c.isMandatory ?? c.is_mandatory ?? false,
-        is_featured: c.isFeatured ?? c.is_featured ?? false,
+        is_mandatory: Boolean(c.isMandatory ?? c.is_mandatory ?? false),
+        is_featured: Boolean(c.isFeatured ?? c.is_featured ?? false),
         tags: Array.isArray(c.tags) ? c.tags.join(", ") : c.tags ?? "",
         passing_score: c.passingScore ?? c.passing_score ?? 70,
         thumbnail_url: c.thumbnailUrl ?? c.thumbnail_url ?? "",
@@ -172,9 +182,27 @@ export default function CourseFormPage() {
         </div>
       </div>
 
+      {/* Global error banner — surfaces react-hook-form validation errors
+          that would otherwise silently block submission (fields above the
+          fold, etc.) so the user can see what's wrong. */}
+      {Object.keys(errors).length > 0 && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <strong>Please fix the following before saving:</strong>
+          <ul className="mt-1 list-disc pl-5">
+            {Object.entries(errors).map(([field, err]: [string, any]) => (
+              <li key={field}>
+                <span className="font-medium">{field}</span>: {err?.message || "invalid"}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Form */}
       <form
-        onSubmit={handleSubmit(onSubmit)}
+        onSubmit={handleSubmit(onSubmit, (invalid) => {
+          console.warn("[CourseFormPage] validation blocked submit", invalid);
+        })}
         className="space-y-6 rounded-2xl bg-white p-6 shadow-sm"
       >
         {/* Title */}
@@ -203,14 +231,16 @@ export default function CourseFormPage() {
 
         {/* Category + Difficulty (2-col) */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Category" error={errors.category?.message} required>
-            <select {...register("category")} className={inputCls}>
+          <Field label="Category" error={errors.category_id?.message} required>
+            <select {...register("category_id")} className={inputCls}>
               <option value="">Select category</option>
-              {categories.map((c: any) => (
-                <option key={c.id ?? c.name} value={c.name ?? c.id}>
-                  {c.name}
-                </option>
-              ))}
+              {categories
+                .filter((c: any) => c && typeof c === "object" && c.id)
+                .map((c: any) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
             </select>
           </Field>
 
@@ -275,8 +305,8 @@ export default function CourseFormPage() {
               <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  checked={field.value}
-                  onChange={field.onChange}
+                  checked={Boolean(field.value)}
+                  onChange={(e) => field.onChange(e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span className="text-gray-700">Mandatory course</span>
@@ -290,8 +320,8 @@ export default function CourseFormPage() {
               <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  checked={field.value}
-                  onChange={field.onChange}
+                  checked={Boolean(field.value)}
+                  onChange={(e) => field.onChange(e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span className="text-gray-700">Featured course</span>
