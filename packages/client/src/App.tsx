@@ -17,6 +17,7 @@ const CourseListPage = lazy(() => import("@/pages/courses/CourseListPage"));
 const CourseFormPage = lazy(() => import("@/pages/courses/CourseFormPage"));
 const CourseDetailPage = lazy(() => import("@/pages/courses/CourseDetailPage"));
 const CourseBuilderPage = lazy(() => import("@/pages/courses/CourseBuilderPage"));
+const LearnerRuntimePage = lazy(() => import("@/pages/courses/LearnerRuntimePage"));
 const MyLearningPage = lazy(() => import("@/pages/courses/MyLearningPage"));
 const LearningPathsPage = lazy(() => import("@/pages/learning-paths/LearningPathsPage"));
 const LearningPathDetailPage = lazy(() => import("@/pages/learning-paths/LearningPathDetailPage"));
@@ -156,6 +157,7 @@ export default function App() {
             <Route path="/courses/:id" element={<CourseDetailPage />} />
             <Route path="/courses/:id/edit" element={<CourseFormPage />} />
             <Route path="/courses/:id/builder" element={<CourseBuilderPage />} />
+            <Route path="/courses/:id/learn" element={<LearnerRuntimePage />} />
             <Route path="/my-learning" element={<MyLearningPage />} />
             <Route path="/learning-paths" element={<LearningPathsPage />} />
             <Route path="/learning-paths/:id" element={<LearningPathDetailPage />} />

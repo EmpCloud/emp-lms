@@ -40,6 +40,20 @@ export function useEnroll() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: (d: any) => apiPost<any>("/enrollments", d), onSuccess: () => qc.invalidateQueries({ queryKey: ["enrollments"] }) });
 }
+export function useMarkLessonComplete(enrollmentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { lessonId: string; time_spent?: number }) =>
+      apiPost<any>(`/enrollments/${enrollmentId}/lessons/${args.lessonId}/complete`, {
+        time_spent: args.time_spent ?? 0,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["enrollments"] });
+      qc.invalidateQueries({ queryKey: ["enrollments", enrollmentId] });
+      qc.invalidateQueries({ queryKey: ["course"] });
+    },
+  });
+}
 
 // ── Quizzes ───────────────────────────────────────────────────────────────
 export function useAllQuizzes(params?: Record<string, any>) {
