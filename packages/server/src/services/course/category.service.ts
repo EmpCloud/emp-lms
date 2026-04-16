@@ -30,17 +30,26 @@ function slugify(text: string): string {
 // ---------------------------------------------------------------------------
 
 export async function listCategories(orgId: number) {
-  const db = getDB();
+  // Use Knex's query builder (via the raw instance) so the return value is
+  // always an unwrapped array of rows instead of the driver-specific
+  // [rows, fields] tuple. The previous db.raw() path leaked the tuple
+  // through sendSuccess and broke the client select dropdown.
+  const { getKnex } = await import("../../db/adapters/knex.adapter");
+  const knex = getKnex();
 
-  const categories = await db.raw<any[]>(
-    `SELECT cat.*, COUNT(c.id) AS course_count
-     FROM course_categories cat
-     LEFT JOIN courses c ON c.category_id = cat.id AND c.status != 'archived'
-     WHERE cat.org_id = ?
-     GROUP BY cat.id
-     ORDER BY cat.sort_order ASC, cat.name ASC`,
-    [orgId]
-  );
+  const categories = await knex("course_categories as cat")
+    .leftJoin("courses as c", function () {
+      this.on("c.category_id", "=", "cat.id").andOn(
+        knex.raw("c.status != ?", ["archived"])
+      );
+    })
+    .where("cat.org_id", orgId)
+    .groupBy("cat.id")
+    .orderBy([
+      { column: "cat.sort_order", order: "asc" },
+      { column: "cat.name", order: "asc" },
+    ])
+    .select("cat.*", knex.raw("COUNT(c.id) AS course_count"));
 
   return categories;
 }

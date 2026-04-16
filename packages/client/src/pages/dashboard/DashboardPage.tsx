@@ -225,7 +225,9 @@ export default function DashboardPage() {
           </h2>
           {Array.isArray(recentEnrollments) && recentEnrollments.length > 0 ? (
             <ul className="space-y-4">
-              {recentEnrollments.map((enrollment: any) => (
+              {recentEnrollments
+                .filter((e: any) => e && typeof e === "object" && e.id)
+                .map((enrollment: any) => (
                 <li key={enrollment.id} className="flex items-start gap-3">
                   <div className="mt-0.5 rounded-full bg-indigo-100 p-2">
                     <Play className="h-4 w-4 text-indigo-600" />

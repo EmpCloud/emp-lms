@@ -68,11 +68,11 @@ export async function createLesson(
   }
 
   const course = await db.findOne<any>("courses", {
-    id: mod.course_id,
+    id: (mod.courseId ?? mod.course_id),
     org_id: orgId,
   });
   if (!course) {
-    throw new NotFoundError("Course", mod.course_id);
+    throw new NotFoundError("Course", (mod.courseId ?? mod.course_id));
   }
 
   // Auto-set sort_order if not provided
@@ -121,17 +121,17 @@ export async function updateLesson(
   }
 
   // Validate ownership via module -> course -> org
-  const mod = await db.findById<any>("course_modules", lesson.module_id);
+  const mod = await db.findById<any>("course_modules", (lesson.moduleId ?? lesson.module_id));
   if (!mod) {
-    throw new NotFoundError("Module", lesson.module_id);
+    throw new NotFoundError("Module", (lesson.moduleId ?? lesson.module_id));
   }
 
   const course = await db.findOne<any>("courses", {
-    id: mod.course_id,
+    id: (mod.courseId ?? mod.course_id),
     org_id: orgId,
   });
   if (!course) {
-    throw new NotFoundError("Course", mod.course_id);
+    throw new NotFoundError("Course", (mod.courseId ?? mod.course_id));
   }
 
   const updated = await db.update<any>("lessons", lessonId, data);
@@ -151,17 +151,17 @@ export async function deleteLesson(orgId: number, lessonId: string) {
   }
 
   // Validate ownership
-  const mod = await db.findById<any>("course_modules", lesson.module_id);
+  const mod = await db.findById<any>("course_modules", (lesson.moduleId ?? lesson.module_id));
   if (!mod) {
-    throw new NotFoundError("Module", lesson.module_id);
+    throw new NotFoundError("Module", (lesson.moduleId ?? lesson.module_id));
   }
 
   const course = await db.findOne<any>("courses", {
-    id: mod.course_id,
+    id: (mod.courseId ?? mod.course_id),
     org_id: orgId,
   });
   if (!course) {
-    throw new NotFoundError("Course", mod.course_id);
+    throw new NotFoundError("Course", (mod.courseId ?? mod.course_id));
   }
 
   await db.delete("lessons", lessonId);
@@ -187,11 +187,11 @@ export async function reorderLessons(
   }
 
   const course = await db.findOne<any>("courses", {
-    id: mod.course_id,
+    id: (mod.courseId ?? mod.course_id),
     org_id: orgId,
   });
   if (!course) {
-    throw new NotFoundError("Course", mod.course_id);
+    throw new NotFoundError("Course", (mod.courseId ?? mod.course_id));
   }
 
   // Validate all IDs belong to this module

@@ -311,6 +311,29 @@ export class KnexAdapter implements IDBAdapter {
   // Raw
   async raw<T>(query: string, params?: any[]): Promise<T> {
     const result = await this.getDb().raw(query, params || []);
+    // MySQL2 via Knex returns [rows, fieldInfo] for raw SELECT statements.
+    // Normalize so callers always see a flat array of rows, regardless of
+    // the underlying driver. Other drivers (pg, sqlite) already return rows
+    // directly, so we only unwrap when the shape matches the mysql2 tuple.
+    if (
+      Array.isArray(result) &&
+      result.length === 2 &&
+      Array.isArray(result[0]) &&
+      !Array.isArray((result as any)[1])
+    ) {
+      return result[0] as T;
+    }
+    // Some mysql2 responses still come as [rows, fields] where fields is
+    // also an array of ColumnDefinition objects — detect that shape too.
+    if (
+      Array.isArray(result) &&
+      result.length === 2 &&
+      Array.isArray(result[0]) &&
+      Array.isArray((result as any)[1]) &&
+      (result as any)[1].every((f: any) => f && typeof f === "object" && "name" in f)
+    ) {
+      return result[0] as T;
+    }
     return result as T;
   }
 }

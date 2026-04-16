@@ -145,7 +145,7 @@ export async function getCourse(orgId: number, id: string) {
     throw new NotFoundError("Course", id);
   }
 
-  const [modulesCount, lessonsCount, quizzesCount, enrollmentCount] =
+  const [modulesCount, lessonsCount, quizzesCount, enrollmentCount, modulesRes, lessonsRes] =
     await Promise.all([
       db.count("course_modules", { course_id: id }),
       db.raw<any[]>(
@@ -156,10 +156,45 @@ export async function getCourse(orgId: number, id: string) {
       ),
       db.count("quizzes", { course_id: id }),
       db.count("enrollments", { course_id: id }),
+      db.findMany<any>("course_modules", {
+        filters: { course_id: id },
+        sort: { field: "sort_order", order: "asc" },
+        limit: 500,
+        page: 1,
+      }),
+      db.raw<any[]>(
+        `SELECT l.* FROM lessons l
+         JOIN course_modules m ON m.id = l.module_id
+         WHERE m.course_id = ?
+         ORDER BY l.sort_order ASC`,
+        [id]
+      ),
     ]);
+
+  // Attach lessons to their parent module so the client can render the
+  // full module tree.
+  const moduleRows = (modulesRes as any)?.data ?? [];
+  const lessonRows = (lessonsRes as any) ?? [];
+  const modules = moduleRows.map((m: any) => ({
+    ...m,
+    lessons: lessonRows
+      .filter((l: any) => (l.moduleId ?? l.module_id) === m.id)
+      .map((l: any) => ({
+        ...l,
+        // Normalize the content_type/content fields the CourseBuilderPage expects
+        contentType: l.contentType ?? l.content_type,
+        content: l.contentUrl ?? l.content_url ?? l.contentText ?? l.content_text ?? "",
+        duration: l.duration ?? l.durationMinutes ?? l.duration_minutes ?? 0,
+        isMandatory: Boolean(l.isMandatory ?? l.is_mandatory ?? false),
+        isPreview: Boolean(l.isPreview ?? l.is_preview ?? false),
+        sortOrder: l.sortOrder ?? l.sort_order ?? 0,
+      })),
+    sortOrder: m.sortOrder ?? m.sort_order ?? 0,
+  }));
 
   return {
     ...course,
+    modules,
     modules_count: modulesCount,
     lessons_count: lessonsCount[0]?.total || 0,
     quizzes_count: quizzesCount,
@@ -408,7 +443,10 @@ export async function publishCourse(orgId: number, id: string) {
 
   const updated = await db.update<any>("courses", id, {
     status: "published",
-    published_at: new Date().toISOString(),
+    // MySQL's DATETIME column (no fractional seconds) rejects ISO strings
+    // with milliseconds (e.g., `2026-04-15T13:54:34.341Z`). Format as
+    // `YYYY-MM-DD HH:MM:SS` so the binding is accepted across drivers.
+    published_at: new Date().toISOString().slice(0, 19).replace("T", " "),
   });
 
   lmsEvents.emit("course.published", {

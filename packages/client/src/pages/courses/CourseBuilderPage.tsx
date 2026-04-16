@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, Navigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import {
@@ -18,6 +18,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/api/client";
+import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 
 // --------------- Types ---------------
 
@@ -78,6 +79,32 @@ const emptyLesson: LessonFormData = {
   isMandatory: false,
   isPreview: false,
 };
+
+// Content types where `content` is a URL (stored in content_url) vs a
+// free-form text/markdown body (stored in content_text).
+const URL_CONTENT_TYPES = new Set(["video", "document", "link", "scorm", "embed"]);
+
+/**
+ * Map the camelCase LessonFormData the UI works in to the snake_case payload
+ * the server's createLessonSchema expects. Also routes `content` to either
+ * `content_url` or `content_text` depending on the content type.
+ */
+function lessonToPayload(data: LessonFormData) {
+  const payload: Record<string, any> = {
+    title: data.title.trim(),
+    description: data.description?.trim() || undefined,
+    content_type: data.contentType,
+    duration_minutes: Number(data.duration) || 0,
+    is_mandatory: Boolean(data.isMandatory),
+    is_preview: Boolean(data.isPreview),
+  };
+  if (URL_CONTENT_TYPES.has(data.contentType)) {
+    if (data.content) payload.content_url = data.content;
+  } else {
+    if (data.content) payload.content_text = data.content;
+  }
+  return payload;
+}
 
 function LessonForm({
   initial,
@@ -280,10 +307,10 @@ function ModuleSection({
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["course", courseId] });
 
-  // Module mutations
+  // Module mutations — server routes are /courses/:courseId/modules/:moduleId
   const updateModule = useMutation({
     mutationFn: () =>
-      apiPut(`/courses/modules/${module.id}`, {
+      apiPut(`/courses/${courseId}/modules/${module.id}`, {
         title: editTitle,
         description: editDesc,
       }),
@@ -292,56 +319,62 @@ function ModuleSection({
       setEditing(false);
       invalidate();
     },
-    onError: () => toast.error("Failed to update module"),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.error?.message || "Failed to update module"),
   });
 
   const deleteModule = useMutation({
-    mutationFn: () => apiDelete(`/courses/modules/${module.id}`),
+    mutationFn: () => apiDelete(`/courses/${courseId}/modules/${module.id}`),
     onSuccess: () => {
       toast.success("Module deleted");
       invalidate();
     },
-    onError: () => toast.error("Failed to delete module"),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.error?.message || "Failed to delete module"),
   });
 
-  // Lesson mutations
+  // Lesson mutations — server routes are /courses/:courseId/modules/:moduleId/lessons
   const createLesson = useMutation({
     mutationFn: (data: LessonFormData) =>
-      apiPost(`/courses/modules/${module.id}/lessons`, data),
+      apiPost(`/courses/${courseId}/modules/${module.id}/lessons`, lessonToPayload(data)),
     onSuccess: () => {
       toast.success("Lesson added");
       setAddingLesson(false);
       invalidate();
     },
-    onError: () => toast.error("Failed to add lesson"),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.error?.message || "Failed to add lesson"),
   });
 
   const updateLesson = useMutation({
     mutationFn: ({ id, data }: { id: string; data: LessonFormData }) =>
-      apiPut(`/courses/lessons/${id}`, data),
+      apiPut(`/courses/${courseId}/lessons/${id}`, lessonToPayload(data)),
     onSuccess: () => {
       toast.success("Lesson updated");
       setEditingLessonId(null);
       invalidate();
     },
-    onError: () => toast.error("Failed to update lesson"),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.error?.message || "Failed to update lesson"),
   });
 
   const deleteLesson = useMutation({
-    mutationFn: (id: string) => apiDelete(`/courses/lessons/${id}`),
+    mutationFn: (id: string) => apiDelete(`/courses/${courseId}/lessons/${id}`),
     onSuccess: () => {
       toast.success("Lesson deleted");
       invalidate();
     },
-    onError: () => toast.error("Failed to delete lesson"),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.error?.message || "Failed to delete lesson"),
   });
 
   // Reorder lessons
   const reorderLessons = useMutation({
     mutationFn: (lessonIds: string[]) =>
-      apiPut(`/courses/modules/${module.id}/lessons/reorder`, { lessonIds }),
+      apiPut(`/courses/${courseId}/modules/${module.id}/lessons/reorder`, { lessonIds }),
     onSuccess: () => invalidate(),
-    onError: () => toast.error("Failed to reorder lessons"),
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.error?.message || "Failed to reorder lessons"),
   });
 
   const moveLessonUp = (idx: number) => {
@@ -633,6 +666,14 @@ function ModuleSection({
 export default function CourseBuilderPage() {
   const { id: courseId } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+
+  // Admin-only page. Non-admins who land here via a stray URL are
+  // redirected to the catalog. Server-side middleware also blocks the
+  // underlying mutations, but this avoids the form flashing into view.
+  const currentUser = useAuthStore((s) => s.user);
+  if (!isAdminRole(currentUser?.role)) {
+    return <Navigate to="/courses" replace />;
+  }
 
   // Fetch course
   const {
