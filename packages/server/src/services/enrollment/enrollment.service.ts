@@ -13,6 +13,16 @@ import {
   ConflictError,
 } from "../../utils/errors";
 
+/**
+ * Format a Date (or now) as `YYYY-MM-DD HH:MM:SS` so the value is accepted
+ * by MySQL DATETIME columns that don't carry fractional-second precision.
+ * A plain `new Date().toISOString()` produces `.sss` milliseconds which
+ * strict mode rejects (see enrollments / courses.published_at).
+ */
+function mysqlDateTime(d: Date = new Date()): string {
+  return d.toISOString().slice(0, 19).replace("T", " ");
+}
+
 // ---------------------------------------------------------------------------
 // Enroll a single user
 // ---------------------------------------------------------------------------
@@ -56,7 +66,7 @@ export async function enrollUser(
     const updated = await db.update<any>("enrollments", existing.id, {
       status: "enrolled",
       progress_percentage: 0,
-      enrolled_at: new Date().toISOString(),
+      enrolled_at: mysqlDateTime(),
       started_at: null,
       completed_at: null,
       due_date: dueDate || null,
@@ -90,7 +100,7 @@ export async function enrollUser(
     course_id: courseId,
     status: "enrolled",
     progress_percentage: 0,
-    enrolled_at: new Date().toISOString(),
+    enrolled_at: mysqlDateTime(),
     started_at: null,
     completed_at: null,
     due_date: dueDate || null,
@@ -351,7 +361,7 @@ export async function markLessonComplete(
   if (existingProgress) {
     await db.update("lesson_progress", existingProgress.id, {
       is_completed: true,
-      completed_at: new Date().toISOString(),
+      completed_at: mysqlDateTime(),
       time_spent_minutes: (existingProgress.time_spent_minutes || 0) + (timeSpent || 0),
       attempts: (existingProgress.attempts || 0) + 1,
     });
@@ -361,7 +371,7 @@ export async function markLessonComplete(
       enrollment_id: enrollmentId,
       lesson_id: lessonId,
       is_completed: true,
-      completed_at: new Date().toISOString(),
+      completed_at: mysqlDateTime(),
       time_spent_minutes: timeSpent || 0,
       attempts: 1,
     });
@@ -371,12 +381,12 @@ export async function markLessonComplete(
   if (enrollment.status === "enrolled") {
     await db.update("enrollments", enrollmentId, {
       status: "in_progress",
-      started_at: enrollment.started_at || new Date().toISOString(),
-      last_accessed_at: new Date().toISOString(),
+      started_at: enrollment.started_at || mysqlDateTime(),
+      last_accessed_at: mysqlDateTime(),
     });
   } else {
     await db.update("enrollments", enrollmentId, {
-      last_accessed_at: new Date().toISOString(),
+      last_accessed_at: mysqlDateTime(),
     });
   }
 
@@ -472,7 +482,7 @@ export async function completeEnrollment(orgId: number, enrollmentId: string) {
 
   await db.update("enrollments", enrollmentId, {
     status: "completed",
-    completed_at: completedAt.toISOString(),
+    completed_at: mysqlDateTime(completedAt),
     progress_percentage: 100,
   });
 

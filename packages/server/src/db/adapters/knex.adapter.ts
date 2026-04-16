@@ -311,28 +311,23 @@ export class KnexAdapter implements IDBAdapter {
   // Raw
   async raw<T>(query: string, params?: any[]): Promise<T> {
     const result = await this.getDb().raw(query, params || []);
-    // MySQL2 via Knex returns [rows, fieldInfo] for raw SELECT statements.
-    // Normalize so callers always see a flat array of rows, regardless of
-    // the underlying driver. Other drivers (pg, sqlite) already return rows
-    // directly, so we only unwrap when the shape matches the mysql2 tuple.
+
+    // MySQL2 via Knex returns a 2-element tuple [rows, fieldInfo] for raw
+    // queries. Normalize so callers always see a flat array of rows. The
+    // detection: a length-2 array where the first element is an array of
+    // plain row objects. PostgreSQL and SQLite already return rows directly
+    // (PG wraps in `{rows: [...], rowCount: n}` which we leave alone).
     if (
       Array.isArray(result) &&
       result.length === 2 &&
-      Array.isArray(result[0]) &&
-      !Array.isArray((result as any)[1])
+      Array.isArray((result as any)[0])
     ) {
-      return result[0] as T;
-    }
-    // Some mysql2 responses still come as [rows, fields] where fields is
-    // also an array of ColumnDefinition objects — detect that shape too.
-    if (
-      Array.isArray(result) &&
-      result.length === 2 &&
-      Array.isArray(result[0]) &&
-      Array.isArray((result as any)[1]) &&
-      (result as any)[1].every((f: any) => f && typeof f === "object" && "name" in f)
-    ) {
-      return result[0] as T;
+      const rows = (result as any)[0];
+      // Only unwrap if rows look like row objects (or empty) — never unwrap
+      // a tuple like [['a','b'], 'something'] that just happens to be length 2.
+      if (rows.length === 0 || (typeof rows[0] === "object" && rows[0] !== null && !Array.isArray(rows[0]))) {
+        return rows as T;
+      }
     }
     return result as T;
   }

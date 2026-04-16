@@ -5,6 +5,13 @@ import { useMyEnrollments } from "@/api/hooks";
 
 type Tab = "in-progress" | "completed" | "all";
 
+// The server returns enrollments with snake_case columns (progress_percentage,
+// time_spent_minutes, last_accessed_at, course_id, course_title). Normalize to
+// a single shape so the render code below doesn't have to juggle field names.
+function getProgress(e: any): number {
+  return Number(e.progress_percentage ?? e.progress ?? 0);
+}
+
 export default function MyLearningPage() {
   const [tab, setTab] = useState<Tab>("in-progress");
   const { data, isLoading, isError } = useMyEnrollments();
@@ -12,8 +19,8 @@ export default function MyLearningPage() {
   const enrollments: any[] = data?.data ?? [];
 
   const filtered = useMemo(() => {
-    if (tab === "in-progress") return enrollments.filter((e) => e.progress < 100);
-    if (tab === "completed") return enrollments.filter((e) => e.progress >= 100);
+    if (tab === "in-progress") return enrollments.filter((e) => getProgress(e) < 100);
+    if (tab === "completed") return enrollments.filter((e) => getProgress(e) >= 100);
     return enrollments;
   }, [enrollments, tab]);
 
@@ -62,11 +69,20 @@ export default function MyLearningPage() {
         </nav>
       </div>
 
-      {/* Empty state */}
+      {/* Empty state — copy depends on which tab is active and whether the
+          user has any enrollments at all. */}
       {filtered.length === 0 && (
         <div className="text-center py-20">
           <Library className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <p className="text-gray-600 mb-4">You haven't enrolled in any courses yet.</p>
+          <p className="text-gray-600 mb-4">
+            {enrollments.length === 0
+              ? "You haven't enrolled in any courses yet."
+              : tab === "in-progress"
+                ? "No courses in progress."
+                : tab === "completed"
+                  ? "You haven't completed any courses yet."
+                  : "No courses to show."}
+          </p>
           <Link
             to="/courses"
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -80,65 +96,71 @@ export default function MyLearningPage() {
       {/* Cards grid */}
       {filtered.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((enrollment: any) => (
-            <div
-              key={enrollment.id}
-              className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col"
-            >
-              <h3 className="text-lg font-semibold text-gray-900 mb-3 line-clamp-2">
-                {enrollment.course_title ?? enrollment.course?.title ?? "Untitled Course"}
-              </h3>
+          {filtered.map((enrollment: any) => {
+            const progress = getProgress(enrollment);
+            const timeSpent = enrollment.time_spent_minutes ?? enrollment.time_spent;
+            const lastAccessed = enrollment.last_accessed_at ?? enrollment.last_accessed;
+            const courseId = enrollment.course_id ?? enrollment.courseId ?? enrollment.course?.id;
+            return (
+              <div
+                key={enrollment.id}
+                className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col"
+              >
+                <h3 className="text-lg font-semibold text-gray-900 mb-3 line-clamp-2">
+                  {enrollment.course_title ?? enrollment.course?.title ?? "Untitled Course"}
+                </h3>
 
-              {/* Progress bar */}
-              <div className="mb-3">
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-gray-500">Progress</span>
-                  <span className="font-medium text-gray-900">{enrollment.progress ?? 0}%</span>
+                {/* Progress bar */}
+                <div className="mb-3">
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-gray-500">Progress</span>
+                    <span className="font-medium text-gray-900">{progress}%</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        progress >= 100 ? "bg-green-500" : "bg-blue-600"
+                      }`}
+                      style={{ width: `${Math.min(progress, 100)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      (enrollment.progress ?? 0) >= 100 ? "bg-green-500" : "bg-blue-600"
-                    }`}
-                    style={{ width: `${Math.min(enrollment.progress ?? 0, 100)}%` }}
-                  />
+
+                {/* Meta */}
+                <div className="flex flex-col gap-1.5 text-sm text-gray-500 mb-4">
+                  {timeSpent != null && Number(timeSpent) > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="h-4 w-4" />
+                      {timeSpent} min spent
+                    </span>
+                  )}
+                  {lastAccessed && (
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="h-4 w-4" />
+                      Last accessed {new Date(lastAccessed).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-auto">
+                  {progress >= 100 ? (
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600">
+                      <CheckCircle className="h-4 w-4" />
+                      Completed
+                    </span>
+                  ) : (
+                    <Link
+                      to={`/courses/${courseId}`}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Play className="h-4 w-4" />
+                      Continue
+                    </Link>
+                  )}
                 </div>
               </div>
-
-              {/* Meta */}
-              <div className="flex flex-col gap-1.5 text-sm text-gray-500 mb-4">
-                {enrollment.time_spent != null && (
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="h-4 w-4" />
-                    {enrollment.time_spent} min spent
-                  </span>
-                )}
-                {enrollment.last_accessed && (
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4" />
-                    Last accessed {new Date(enrollment.last_accessed).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-
-              <div className="mt-auto">
-                {(enrollment.progress ?? 0) >= 100 ? (
-                  <span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600">
-                    <CheckCircle className="h-4 w-4" />
-                    Completed
-                  </span>
-                ) : (
-                  <Link
-                    to={`/courses/${enrollment.course_id ?? enrollment.course?.id}`}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Play className="h-4 w-4" />
-                    Continue
-                  </Link>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

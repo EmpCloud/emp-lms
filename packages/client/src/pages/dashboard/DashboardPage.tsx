@@ -108,12 +108,23 @@ export default function DashboardPage() {
     useMyEnrollments({ limit: 5 });
 
   const isLoading = analyticsLoading || enrollmentsLoading;
-  const stats = analytics?.data;
+  // The server returns snake_case fields (total_courses, total_enrollments,
+  // completed_enrollments, total_certificates_issued, ...). Normalize to a
+  // single `stats` object so the cards below stay readable and either name
+  // shape works (in case the API ever switches to camelCase).
+  const raw = analytics?.data ?? {};
+  const stats = {
+    totalCourses: raw.total_courses ?? raw.totalCourses ?? 0,
+    myEnrollments: raw.total_enrollments ?? raw.myEnrollments ?? 0,
+    completed: raw.completed_enrollments ?? raw.completed ?? 0,
+    certificatesEarned: raw.total_certificates_issued ?? raw.certificatesEarned ?? 0,
+    currentStreak: raw.current_streak ?? raw.currentStreak ?? 0,
+    completionByMonth: raw.completion_by_month ?? raw.completionByMonth ?? [],
+  };
   const recentEnrollments = enrollments?.data ?? [];
 
   /* Build simple chart data from analytics */
-  const chartData: { name: string; completion: number }[] =
-    stats?.completionByMonth ?? [];
+  const chartData: { name: string; completion: number }[] = stats.completionByMonth ?? [];
 
   /* ── Loading state ─────────────────────────────────────────────────── */
   if (isLoading) {
