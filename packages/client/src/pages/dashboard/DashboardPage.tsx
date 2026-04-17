@@ -19,8 +19,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { useOverviewAnalytics } from "@/api/hooks";
-import { useMyEnrollments } from "@/api/hooks";
+import { useOverviewAnalytics, useMyEnrollments, useMyCertificates } from "@/api/hooks";
 import { formatDate } from "@/lib/utils";
 import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 
@@ -112,17 +111,27 @@ export default function DashboardPage() {
     useOverviewAnalytics();
   const { data: allEnrollments, isLoading: enrollmentsLoading } =
     useMyEnrollments({ limit: 100 });
-  const { data: recentEnroll, isLoading: recentLoading } =
-    useMyEnrollments({ limit: 5 });
+  const { data: certs } = useMyCertificates();
 
-  const isLoading = (isAdmin ? analyticsLoading : false) || enrollmentsLoading || recentLoading;
+  const isLoading = (isAdmin ? analyticsLoading : false) || enrollmentsLoading;
 
   const myEnrollmentList: any[] = allEnrollments?.data ?? [];
-  const recentEnrollments: any[] = recentEnroll?.data ?? [];
+  const myCertsList: any[] = certs?.data ?? [];
 
-  // For employees: derive stats from their own enrollments.
-  // For admins: use the analytics endpoint (org-wide numbers).
+  // Recent enrollments — sorted by most recent activity
+  const recentEnrollments: any[] = [...myEnrollmentList]
+    .sort((a: any, b: any) => {
+      const da = a.updatedAt || a.updated_at || a.enrolledAt || a.enrolled_at || "";
+      const db2 = b.updatedAt || b.updated_at || b.enrolledAt || b.enrolled_at || "";
+      return db2 > da ? 1 : -1;
+    })
+    .slice(0, 5);
+
+  // For employees: derive stats from their own enrollments + certs.
   const raw = analytics?.data ?? {};
+  const completedEnrollments = myEnrollmentList.filter(
+    (e: any) => e.status === "completed",
+  );
   const stats = isAdmin
     ? {
         totalCourses: raw.total_courses ?? raw.totalCourses ?? 0,
@@ -136,16 +145,25 @@ export default function DashboardPage() {
     : {
         totalCourses: myEnrollmentList.length,
         myEnrollments: myEnrollmentList.length,
-        completed: myEnrollmentList.filter(
-          (e: any) => e.status === "completed",
-        ).length,
-        certificatesEarned: 0, // computed separately if needed
+        completed: completedEnrollments.length,
+        certificatesEarned: myCertsList.length,
         currentStreak: 0,
         completionByMonth: [] as any[],
       };
 
-  /* Build simple chart data from analytics */
-  const chartData: { name: string; completion: number }[] = stats.completionByMonth ?? [];
+  // Build chart data — for employees, show per-course progress as a bar chart
+  // since we don't have monthly aggregation without the analytics endpoint.
+  const chartData: { name: string; completion: number }[] =
+    stats.completionByMonth.length > 0
+      ? stats.completionByMonth
+      : myEnrollmentList.slice(0, 8).map((e: any) => ({
+          name:
+            (e.course_title ?? e.courseTitle ?? e.course?.title ?? "Course")
+              .split(" ")
+              .slice(0, 3)
+              .join(" "),
+          completion: Number(e.progress_percentage ?? e.progressPercentage ?? e.progress ?? 0),
+        }));
 
   /* ── Loading state ─────────────────────────────────────────────────── */
   if (isLoading) {
@@ -266,12 +284,12 @@ export default function DashboardPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-gray-800">
-                      {enrollment.courseTitle ?? enrollment.course?.title ?? "Course"}
+                      {enrollment.courseTitle ?? enrollment.course?.title ?? enrollment.courseName ?? enrollment.course_title ?? "Course"}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {enrollment.progress ?? 0}% complete
-                      {enrollment.updatedAt &&
-                        ` \u00b7 ${formatDate(enrollment.updatedAt)}`}
+                      {Number(enrollment.progressPercentage ?? enrollment.progress_percentage ?? enrollment.progress ?? 0)}% complete
+                      {(enrollment.updatedAt || enrollment.updated_at) &&
+                        ` \u00b7 ${formatDate(enrollment.updatedAt || enrollment.updated_at)}`}
                     </p>
                   </div>
                 </li>
