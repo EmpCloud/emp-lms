@@ -361,17 +361,25 @@ export async function getUserComplianceRecords(
     sort: { field: "due_date", order: "asc" },
   });
 
-  // Enrich with course title and assignment name
+  // Enrich with course title and assignment name.
+  // Adapter camelizes: course_id → courseId, assignment_id → assignmentId.
   const enriched = await Promise.all(
     result.data.map(async (record: any) => {
+      const cid = record.courseId ?? record.course_id;
+      const aid = record.assignmentId ?? record.assignment_id;
       const [course, assignment] = await Promise.all([
-        db.findById<any>("courses", record.course_id),
-        db.findById<any>("compliance_assignments", record.assignment_id),
+        cid ? db.findById<any>("courses", cid) : null,
+        aid ? db.findById<any>("compliance_assignments", aid) : null,
       ]);
       return {
         ...record,
+        course_id: cid,
+        assignment_id: aid,
         course_title: course?.title || null,
-        assignment_name: assignment?.name || null,
+        assignment_name: assignment?.name || assignment?.title || null,
+        assignment_description: assignment?.description || null,
+        due_date: record.dueDate ?? record.due_date,
+        completed_at: record.completedAt ?? record.completed_at,
       };
     })
   );
