@@ -371,15 +371,25 @@ export async function getUserComplianceRecords(
         cid ? db.findById<any>("courses", cid) : null,
         aid ? db.findById<any>("compliance_assignments", aid) : null,
       ]);
+      // Derive progress from status for the frontend progress bar
+      const progress =
+        record.status === "completed" ? 100
+        : record.status === "in_progress" ? 50
+        : 0;
+
       return {
         ...record,
         course_id: cid,
         assignment_id: aid,
+        // The page reads courseName (camelCase) and course_title (snake)
         course_title: course?.title || null,
+        courseName: course?.title || null,
         assignment_name: assignment?.name || assignment?.title || null,
+        assignmentName: assignment?.name || assignment?.title || null,
         assignment_description: assignment?.description || null,
         due_date: record.dueDate ?? record.due_date,
         completed_at: record.completedAt ?? record.completed_at,
+        progress,
       };
     })
   );
