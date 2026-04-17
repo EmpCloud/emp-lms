@@ -132,6 +132,14 @@ export function useEnrollInPath() {
 export function useMyCertificates(params?: Record<string, any>) {
   return useQuery({ queryKey: ["certificates", "my", params], queryFn: () => apiGet<any>("/certificates/my", params) });
 }
+export function useAllCertificates(params?: Record<string, any>) {
+  return useQuery({ queryKey: ["certificates", "all", params], queryFn: () => apiGet<any>("/certificates/admin/all", params) });
+}
+export function useVerifyCertificateByNumber() {
+  return useMutation({
+    mutationFn: (certNumber: string) => apiGet<any>(`/certificates/verify/${encodeURIComponent(certNumber)}`),
+  });
+}
 
 // ── Compliance ────────────────────────────────────────────────────────────
 export function useMyCompliance(params?: Record<string, any>) {

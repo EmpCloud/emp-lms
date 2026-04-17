@@ -10,6 +10,7 @@ import fs from "fs";
 import Handlebars from "handlebars";
 import puppeteer from "puppeteer";
 import { getDB } from "../../db/adapters/index";
+import { findUserById } from "../../db/empcloud";
 import { lmsEvents } from "../../events/index";
 import { logger } from "../../utils/logger";
 import {
@@ -212,6 +213,55 @@ export async function getUserCertificates(orgId: number, userId: number) {
   return certificates;
 }
 
+// Admin: list all certificates in the org, enriched with user + course data.
+export async function getAllOrgCertificates(
+  orgId: number,
+  filters?: { page?: number; limit?: number; status?: string }
+) {
+  const db = getDB();
+
+  const queryFilters: Record<string, any> = { org_id: orgId };
+  if (filters?.status) queryFilters.status = filters.status;
+
+  const result = await db.findMany<any>("certificates", {
+    page: filters?.page || 1,
+    limit: filters?.limit || 50,
+    filters: queryFilters,
+    sort: { field: "issued_at", order: "desc" },
+  });
+
+  const enriched = await Promise.all(
+    result.data.map(async (cert: any) => {
+      const cid = cert.courseId ?? cert.course_id;
+      const uid = cert.userId ?? cert.user_id;
+      const [course, user] = await Promise.all([
+        cid ? db.findById<any>("courses", cid).catch(() => null) : null,
+        uid ? findUserById(uid).catch(() => null) : null,
+      ]);
+      return {
+        id: cert.id,
+        certificateNumber: cert.certificateNumber ?? cert.certificate_number,
+        userId: uid,
+        userName: user ? `${user.first_name} ${user.last_name}` : "Unknown User",
+        userEmail: user?.email ?? null,
+        courseId: cid,
+        courseName: course?.title ?? "Unknown Course",
+        issuedDate: cert.issuedAt ?? cert.issued_at,
+        expiryDate: cert.expiresAt ?? cert.expires_at ?? null,
+        status: cert.status,
+      };
+    })
+  );
+
+  return {
+    data: enriched,
+    total: result.total,
+    page: result.page,
+    limit: result.limit,
+    totalPages: result.totalPages,
+  };
+}
+
 export async function getCourseCertificates(orgId: number, courseId: string) {
   const db = getDB();
 
@@ -231,6 +281,18 @@ export async function getCourseCertificates(orgId: number, courseId: string) {
 // Public Verification
 // ---------------------------------------------------------------------------
 
+function normalizeVerifyResponse(certificate: any, course: any) {
+  return {
+    certificate_number: certificate.certificateNumber ?? certificate.certificate_number,
+    status: certificate.status,
+    issued_at: certificate.issuedAt ?? certificate.issued_at,
+    expires_at: certificate.expiresAt ?? certificate.expires_at ?? null,
+    course_title: course ? course.title : null,
+    org_id: certificate.orgId ?? certificate.org_id,
+    is_valid: certificate.status === "active",
+  };
+}
+
 export async function verifyCertificate(certificateNumber: string) {
   const db = getDB();
 
@@ -242,17 +304,24 @@ export async function verifyCertificate(certificateNumber: string) {
     throw new NotFoundError("Certificate", certificateNumber);
   }
 
-  const course = await db.findById<any>("courses", certificate.course_id);
+  const cid = certificate.courseId ?? certificate.course_id;
+  const course = cid ? await db.findById<any>("courses", cid) : null;
+  return normalizeVerifyResponse(certificate, course);
+}
 
-  return {
-    certificate_number: certificate.certificate_number,
-    status: certificate.status,
-    issued_at: certificate.issued_at,
-    expires_at: certificate.expires_at,
-    course_title: course ? course.title : null,
-    org_id: certificate.org_id,
-    is_valid: certificate.status === "active",
-  };
+// Verify by certificate ID — for authenticated admin use on the certifications
+// page (where we already have the UUID, not the number).
+export async function verifyCertificateById(certificateId: string) {
+  const db = getDB();
+
+  const certificate = await db.findById<any>("certificates", certificateId);
+  if (!certificate) {
+    throw new NotFoundError("Certificate", certificateId);
+  }
+
+  const cid = certificate.courseId ?? certificate.course_id;
+  const course = cid ? await db.findById<any>("courses", cid) : null;
+  return normalizeVerifyResponse(certificate, course);
 }
 
 // ---------------------------------------------------------------------------

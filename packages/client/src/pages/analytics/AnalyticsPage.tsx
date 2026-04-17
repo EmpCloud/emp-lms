@@ -117,21 +117,28 @@ export default function AnalyticsPage() {
         <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-gray-900">Completion Trend</h2>
           <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={completionTrend}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="completions"
-                  stroke="#6366f1"
-                  strokeWidth={2}
-                  dot={{ r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {completionTrend.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={completionTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#9ca3af" />
+                  <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" allowDecimals={false} />
+                  <Tooltip contentStyle={{ borderRadius: "0.5rem", fontSize: "0.875rem" }} />
+                  <Line
+                    type="monotone"
+                    dataKey="completions"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    dot={{ r: 4, fill: "#6366f1" }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                No completion data in the last 6 months.
+              </div>
+            )}
           </div>
         </div>
 
@@ -139,20 +146,28 @@ export default function AnalyticsPage() {
         <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-gray-900">Top Courses</h2>
           <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topCourses} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" tick={{ fontSize: 12 }} />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  width={120}
-                  tick={{ fontSize: 11 }}
-                />
-                <Tooltip />
-                <Bar dataKey="enrollments" fill="#6366f1" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {topCourses.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topCourses} layout="vertical" margin={{ left: 10, right: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis type="number" tick={{ fontSize: 12 }} stroke="#9ca3af" allowDecimals={false} />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    width={140}
+                    tick={{ fontSize: 11 }}
+                    stroke="#9ca3af"
+                    interval={0}
+                  />
+                  <Tooltip contentStyle={{ borderRadius: "0.5rem", fontSize: "0.875rem" }} />
+                  <Bar dataKey="enrollments" fill="#6366f1" radius={[0, 4, 4, 0]} name="Enrollments" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                No course enrollments yet.
+              </div>
+            )}
           </div>
         </div>
 
@@ -160,27 +175,33 @@ export default function AnalyticsPage() {
         <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
           <h2 className="mb-4 text-sm font-semibold text-gray-900">Enrollment by Department</h2>
           <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={departmentData}
-                  dataKey="count"
-                  nameKey="department"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  label={({ department, percent }) =>
-                    `${department} (${(percent * 100).toFixed(0)}%)`
-                  }
-                >
-                  {departmentData.map((_: any, i: number) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            {departmentData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={departmentData}
+                    dataKey="count"
+                    nameKey="department"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    label={({ department, percent }: any) =>
+                      `${department} (${((percent ?? 0) * 100).toFixed(0)}%)`
+                    }
+                  >
+                    {departmentData.map((_: any, i: number) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                No department data available. Enrollments may not be linked to departments.
+              </div>
+            )}
           </div>
         </div>
       </div>

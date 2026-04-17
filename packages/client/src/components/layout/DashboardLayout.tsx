@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   BookOpen,
@@ -24,22 +24,58 @@ interface NavItem {
   label: string;
   to: string;
   icon: React.ElementType;
+  // When true, shown only to admins
   adminOnly?: boolean;
+  // When true, shown to everyone EXCEPT admins (e.g. the single "Certifications"
+  // item for employees — admins see "My Certifications" + "Manage Certifications" instead)
+  employeeOnly?: boolean;
+  // end: match the URL exactly (including query string) for active state
+  end?: boolean;
 }
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard },
-  { label: "My Learning", to: "/my-learning", icon: BookOpen },
-  { label: "Course Catalog", to: "/courses", icon: Library },
-  { label: "Learning Paths", to: "/learning-paths", icon: Route },
-  { label: "Certifications", to: "/certifications", icon: Award },
-  { label: "Compliance", to: "/compliance", icon: ShieldCheck },
-  { label: "Live Training", to: "/ilt", icon: Video },
-  { label: "Quizzes", to: "/quizzes/manage", icon: ClipboardCheck, adminOnly: true },
-  { label: "Leaderboard", to: "/leaderboard", icon: Trophy },
-  { label: "Marketplace", to: "/marketplace", icon: ShoppingBag },
-  { label: "Analytics", to: "/analytics", icon: BarChart3, adminOnly: true },
-  { label: "Settings", to: "/settings", icon: Settings },
+interface NavSection {
+  heading?: string;
+  items: NavItem[];
+}
+
+// Nav is split into clearly-scoped sections so admins can quickly tell their
+// personal learner view apart from admin-only management tools.
+// For Certifications and Compliance, admins get TWO items — a "My ___" view
+// (their own records) and a "Manage ___" view (org-wide admin dashboard).
+const navSections: NavSection[] = [
+  {
+    items: [{ label: "Dashboard", to: "/dashboard", icon: LayoutDashboard }],
+  },
+  {
+    heading: "My Learning",
+    items: [
+      { label: "My Learning", to: "/my-learning", icon: BookOpen },
+      { label: "Course Catalog", to: "/courses", icon: Library },
+      { label: "Learning Paths", to: "/learning-paths", icon: Route },
+      { label: "Live Training", to: "/ilt", icon: Video },
+      // Employee-only single entry
+      { label: "Certifications", to: "/certifications", icon: Award, employeeOnly: true },
+      { label: "Compliance", to: "/compliance", icon: ShieldCheck, employeeOnly: true },
+      // Admin-only: personal views (force ?view=my)
+      { label: "My Certifications", to: "/certifications?view=my", icon: Award, adminOnly: true },
+      { label: "My Compliance", to: "/compliance?view=my", icon: ShieldCheck, adminOnly: true },
+      { label: "Leaderboard", to: "/leaderboard", icon: Trophy },
+      { label: "Marketplace", to: "/marketplace", icon: ShoppingBag },
+    ],
+  },
+  {
+    heading: "Administration",
+    items: [
+      { label: "Analytics", to: "/analytics", icon: BarChart3, adminOnly: true },
+      { label: "Manage Certifications", to: "/certifications", icon: Award, adminOnly: true },
+      { label: "Manage Compliance", to: "/compliance", icon: ShieldCheck, adminOnly: true },
+      { label: "Manage Quizzes", to: "/quizzes/manage", icon: ClipboardCheck, adminOnly: true },
+    ],
+  },
+  {
+    heading: "Account",
+    items: [{ label: "Settings", to: "/settings", icon: Settings }],
+  },
 ];
 
 function UserAvatar({ firstName, lastName }: { firstName: string; lastName: string }) {
@@ -56,7 +92,29 @@ export default function DashboardLayout() {
   const { user, logout } = useAuthStore();
 
   const isAdmin = isAdminRole(user?.role);
-  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+  const location = useLocation();
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (item.adminOnly && !isAdmin) return false;
+        if (item.employeeOnly && isAdmin) return false;
+        return true;
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
+
+  // Split a "/path?view=my" into pathname + search so we can match both parts
+  // when deciding which nav item is active. Without this, "Manage Certifications"
+  // (/certifications) and "My Certifications" (/certifications?view=my) would
+  // both highlight on either URL.
+  const isItemActive = (to: string) => {
+    const [path, query = ""] = to.split("?");
+    if (location.pathname !== path) return false;
+    const currentQuery = location.search.replace(/^\?/, "");
+    if (!query) return !currentQuery.includes("view=");
+    return currentQuery === query;
+  };
 
   const firstName = user?.firstName ?? "";
   const lastName = user?.lastName ?? "";
@@ -98,26 +156,36 @@ export default function DashboardLayout() {
 
         {/* Nav links */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <ul className="space-y-1">
-            {visibleNavItems.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  onClick={() => setSidebarOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                      isActive
-                        ? "bg-brand-50 text-brand-600"
-                        : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
-                    }`
-                  }
-                >
-                  <item.icon className="h-5 w-5 flex-shrink-0" />
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
+          {visibleSections.map((section, sIdx) => (
+            <div key={section.heading ?? `section-${sIdx}`} className={sIdx > 0 ? "mt-5" : ""}>
+              {section.heading && (
+                <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  {section.heading}
+                </p>
+              )}
+              <ul className="space-y-1">
+                {section.items.map((item) => {
+                  const active = isItemActive(item.to);
+                  return (
+                    <li key={item.to}>
+                      <NavLink
+                        to={item.to}
+                        onClick={() => setSidebarOpen(false)}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                          active
+                            ? "bg-brand-50 text-brand-600"
+                            : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                        }`}
+                      >
+                        <item.icon className="h-5 w-5 flex-shrink-0" />
+                        {item.label}
+                      </NavLink>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
         </nav>
 
         {/* User section */}

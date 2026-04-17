@@ -149,6 +149,29 @@ router.get(
   }
 );
 
+// GET /certificates/admin/all — list all org certificates (admin only)
+router.get(
+  "/admin/all",
+  authenticate,
+  authorize(...ADMIN_ROLES),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { page, limit, status } = req.query;
+      const result = await certService.getAllOrgCertificates(
+        req.user!.empcloudOrgId,
+        {
+          page: page ? Number(page) : undefined,
+          limit: limit ? Number(limit) : undefined,
+          status: status as string | undefined,
+        }
+      );
+      sendSuccess(res, result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // GET /certificates/course/:courseId — all certificates for a course
 router.get(
   "/course/:courseId",
@@ -190,6 +213,21 @@ router.post(
         template_id
       );
       sendSuccess(res, certificate, 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /certificates/:id/verify — verify a specific certificate by ID (authenticated)
+// Must be declared before the bare /:id route so it doesn't get swallowed.
+router.get(
+  "/:id/verify",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await certService.verifyCertificateById(req.params.id);
+      sendSuccess(res, result);
     } catch (err) {
       next(err);
     }

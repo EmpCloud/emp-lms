@@ -21,7 +21,7 @@ import {
   Trash2,
   Save,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
 import {
@@ -979,8 +979,12 @@ function EmployeeComplianceView() {
 export default function CompliancePage() {
   const user = useAuthStore((s) => s.user);
   const isAdmin = isAdminRole(user?.role);
+  const [searchParams] = useSearchParams();
+  // ?view=my forces the personal view even for admins — used by the
+  // "My Compliance" menu item in the sidebar.
+  const viewMode = searchParams.get("view");
 
-  if (isAdmin) {
+  if (isAdmin && viewMode !== "my") {
     return <AdminComplianceDashboard />;
   }
 

@@ -12,6 +12,18 @@ interface VerifyResult {
   status?: string;
 }
 
+// The server returns snake_case keys; normalize into the shape the UI expects.
+function normalizeVerifyResponse(raw: any): VerifyResult {
+  return {
+    valid: Boolean(raw?.is_valid ?? raw?.valid ?? (raw?.status === "active")),
+    status: raw?.status,
+    courseName: raw?.course_title ?? raw?.courseName,
+    issuedDate: raw?.issued_at ?? raw?.issuedDate,
+    expiryDate: raw?.expires_at ?? raw?.expiryDate,
+    holder: raw?.holder,
+  };
+}
+
 interface CertificateDownloadProps {
   certificateId: string;
   className?: string;
@@ -40,9 +52,9 @@ export default function CertificateDownload({ certificateId, className = "", sho
     setVerifying(true);
     setShowVerifyResult(true);
     try {
-      const res = await apiGet<VerifyResult>(`/certificates/${certificateId}/verify`);
+      const res = await apiGet<any>(`/certificates/${certificateId}/verify`);
       if (res.success && res.data) {
-        setVerifyResult(res.data);
+        setVerifyResult(normalizeVerifyResponse(res.data));
       } else {
         setVerifyResult({ valid: false });
       }
