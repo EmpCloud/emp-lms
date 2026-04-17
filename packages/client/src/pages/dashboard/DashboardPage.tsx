@@ -22,6 +22,7 @@ import {
 import { useOverviewAnalytics } from "@/api/hooks";
 import { useMyEnrollments } from "@/api/hooks";
 import { formatDate } from "@/lib/utils";
+import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 
 /* ── Skeleton ────────────────────────────────────────────────────────────── */
 function StatSkeleton() {
@@ -102,26 +103,46 @@ function QuickLink({
 
 /* ── Main Page ───────────────────────────────────────────────────────────── */
 export default function DashboardPage() {
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = isAdminRole(user?.role);
+
+  // Admin gets the full analytics endpoint; employees compute from their
+  // own enrollments (the analytics route is admin-only and 403s otherwise).
   const { data: analytics, isLoading: analyticsLoading } =
     useOverviewAnalytics();
-  const { data: enrollments, isLoading: enrollmentsLoading } =
+  const { data: allEnrollments, isLoading: enrollmentsLoading } =
+    useMyEnrollments({ limit: 100 });
+  const { data: recentEnroll, isLoading: recentLoading } =
     useMyEnrollments({ limit: 5 });
 
-  const isLoading = analyticsLoading || enrollmentsLoading;
-  // The server returns snake_case fields (total_courses, total_enrollments,
-  // completed_enrollments, total_certificates_issued, ...). Normalize to a
-  // single `stats` object so the cards below stay readable and either name
-  // shape works (in case the API ever switches to camelCase).
+  const isLoading = (isAdmin ? analyticsLoading : false) || enrollmentsLoading || recentLoading;
+
+  const myEnrollmentList: any[] = allEnrollments?.data ?? [];
+  const recentEnrollments: any[] = recentEnroll?.data ?? [];
+
+  // For employees: derive stats from their own enrollments.
+  // For admins: use the analytics endpoint (org-wide numbers).
   const raw = analytics?.data ?? {};
-  const stats = {
-    totalCourses: raw.total_courses ?? raw.totalCourses ?? 0,
-    myEnrollments: raw.total_enrollments ?? raw.myEnrollments ?? 0,
-    completed: raw.completed_enrollments ?? raw.completed ?? 0,
-    certificatesEarned: raw.total_certificates_issued ?? raw.certificatesEarned ?? 0,
-    currentStreak: raw.current_streak ?? raw.currentStreak ?? 0,
-    completionByMonth: raw.completion_by_month ?? raw.completionByMonth ?? [],
-  };
-  const recentEnrollments = enrollments?.data ?? [];
+  const stats = isAdmin
+    ? {
+        totalCourses: raw.total_courses ?? raw.totalCourses ?? 0,
+        myEnrollments: raw.total_enrollments ?? raw.myEnrollments ?? 0,
+        completed: raw.completed_enrollments ?? raw.completed ?? 0,
+        certificatesEarned:
+          raw.total_certificates_issued ?? raw.certificatesEarned ?? 0,
+        currentStreak: raw.current_streak ?? raw.currentStreak ?? 0,
+        completionByMonth: raw.completion_by_month ?? raw.completionByMonth ?? [],
+      }
+    : {
+        totalCourses: myEnrollmentList.length,
+        myEnrollments: myEnrollmentList.length,
+        completed: myEnrollmentList.filter(
+          (e: any) => e.status === "completed",
+        ).length,
+        certificatesEarned: 0, // computed separately if needed
+        currentStreak: 0,
+        completionByMonth: [] as any[],
+      };
 
   /* Build simple chart data from analytics */
   const chartData: { name: string; completion: number }[] = stats.completionByMonth ?? [];

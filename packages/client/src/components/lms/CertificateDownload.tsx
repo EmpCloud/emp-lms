@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, ShieldCheck, Loader2, X, CheckCircle, XCircle } from "lucide-react";
+import { Download, Printer, ShieldCheck, Loader2, X, CheckCircle, XCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { api, apiGet } from "@/api/client";
 
@@ -85,7 +85,32 @@ export default function CertificateDownload({ certificateId, className = "" }: C
           ) : (
             <Download className="h-3.5 w-3.5" />
           )}
-          Download PDF
+          Download
+        </button>
+
+        {/* Print button — opens the certificate HTML in a new window and
+            triggers the browser print dialog. */}
+        <button
+          onClick={async () => {
+            try {
+              const response = await api.get(`/certificates/${certificateId}/download`, {
+                responseType: "text",
+              });
+              const html = typeof response.data === "string" ? response.data : response.data?.html || "";
+              const win = window.open("", "_blank", "width=900,height=700");
+              if (win) {
+                win.document.write(html || "<p>Certificate preview not available</p>");
+                win.document.close();
+                setTimeout(() => win.print(), 500);
+              }
+            } catch {
+              toast.error("Failed to load certificate for printing");
+            }
+          }}
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
+        >
+          <Printer className="h-3.5 w-3.5" />
+          Print
         </button>
 
         {/* Verify button */}

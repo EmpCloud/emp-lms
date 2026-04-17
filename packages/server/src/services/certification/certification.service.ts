@@ -185,12 +185,21 @@ export async function getUserCertificates(orgId: number, userId: number) {
     limit: 1000,
   });
 
-  // Enrich with course info
+  // Enrich with course info. The adapter camelizes keys so
+  // course_id → courseId, certificate_number → certificateNumber etc.
   const certificates = [];
   for (const cert of result.data) {
-    const course = await db.findById<any>("courses", cert.course_id);
+    const cid = cert.courseId ?? cert.course_id;
+    const course = cid ? await db.findById<any>("courses", cid) : null;
     certificates.push({
-      ...cert,
+      id: cert.id,
+      certificateNumber: cert.certificateNumber ?? cert.certificate_number,
+      courseName: course?.title ?? "Unknown Course",
+      courseSlug: course?.slug,
+      issuedDate: cert.issuedAt ?? cert.issued_at,
+      expiryDate: cert.expiresAt ?? cert.expires_at ?? null,
+      status: cert.status,
+      pdfUrl: cert.pdfUrl ?? cert.pdf_url ?? null,
       metadata: typeof cert.metadata === "string" ? JSON.parse(cert.metadata) : cert.metadata,
       course: course
         ? { id: course.id, title: course.title, slug: course.slug }

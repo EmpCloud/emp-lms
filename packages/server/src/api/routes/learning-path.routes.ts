@@ -43,6 +43,7 @@ router.get(
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = req.user!.empcloudOrgId;
+    const userId = req.user!.empcloudUserId;
     const { page, limit, status, difficulty, is_mandatory, search, sort, order } =
       req.query;
 
@@ -58,18 +59,110 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
       order: order as "asc" | "desc",
     });
 
-    sendPaginated(res, result.data, result.total, result.page, result.limit);
+    // Enrich with current user's enrollment / progress so the catalog can
+    // show progress bars and swap Enroll → Continue without a follow-up
+    // request per card.
+    const { getDB } = await import("../../db/adapters/index.js");
+    const db = getDB();
+    const rawRows: any = await db.raw(
+      `SELECT learning_path_id, status, progress_percentage FROM learning_path_enrollments WHERE org_id = ? AND user_id = ?`,
+      [orgId, userId]
+    );
+    const enrollmentRows = Array.isArray(rawRows) && Array.isArray(rawRows[0]) ? rawRows[0] : Array.isArray(rawRows) ? rawRows : [];
+    const userEnrollments = new Map<string, any>();
+    for (const r of enrollmentRows) userEnrollments.set(r.learning_path_id, r);
+
+    const enriched = result.data.map((path: any) => {
+      const enrollment = userEnrollments.get(path.id);
+      return {
+        ...path,
+        progress: enrollment ? Number(enrollment.progress_percentage) : null,
+        enrolled: !!enrollment,
+        enrollment_status: enrollment?.status ?? null,
+      };
+    });
+
+    sendPaginated(res, enriched, result.total, result.page, result.limit);
   } catch (err) {
     next(err);
   }
 });
 
-// GET /learning-paths/:id — get learning path details
+// GET /learning-paths/:id — get learning path details + user enrollment/progress
 router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = req.user!.empcloudOrgId;
+    const userId = req.user!.empcloudUserId;
     const path = await learningPathService.getLearningPath(orgId, req.params.id);
-    sendSuccess(res, path);
+
+    // Enrich with user's path enrollment
+    const { getDB } = await import("../../db/adapters/index.js");
+    const db = getDB();
+
+    const pathEnrollRaw: any = await db.raw(
+      `SELECT status, progress_percentage, enrolled_at, completed_at
+       FROM learning_path_enrollments
+       WHERE org_id = ? AND user_id = ? AND learning_path_id = ?
+       LIMIT 1`,
+      [orgId, userId, req.params.id]
+    );
+    const pathEnroll = (Array.isArray(pathEnrollRaw) && Array.isArray(pathEnrollRaw[0])
+      ? pathEnrollRaw[0][0]
+      : Array.isArray(pathEnrollRaw) ? pathEnrollRaw[0] : null);
+
+    // Enrich each course with the user's enrollment status so the timeline
+    // can show completed / in-progress / available / locked.
+    const courseIds = (path.courses || []).map((c: any) => c.id).filter(Boolean);
+    let courseStatusMap = new Map<string, any>();
+    if (courseIds.length > 0 && pathEnroll) {
+      const placeholders = courseIds.map(() => "?").join(",");
+      const courseEnrollRaw: any = await db.raw(
+        `SELECT course_id, status, progress_percentage
+         FROM enrollments
+         WHERE org_id = ? AND user_id = ? AND course_id IN (${placeholders})`,
+        [orgId, userId, ...courseIds]
+      );
+      const rows = Array.isArray(courseEnrollRaw) && Array.isArray(courseEnrollRaw[0])
+        ? courseEnrollRaw[0]
+        : Array.isArray(courseEnrollRaw) ? courseEnrollRaw : [];
+      for (const r of rows) courseStatusMap.set(r.course_id, r);
+    }
+
+    // Derive per-course status: completed > in_progress > available (first
+    // non-completed course) > locked (everything after the first available).
+    let firstAvailableSeen = false;
+    const enrichedCourses = (path.courses || []).map((course: any) => {
+      if (!pathEnroll) {
+        // Not enrolled in path — all courses show as available (preview)
+        return { ...course, status: "available", course_progress: 0 };
+      }
+      const enrollment = courseStatusMap.get(course.id);
+      if (enrollment) {
+        const s = enrollment.status;
+        if (s === "completed") {
+          return { ...course, status: "completed", course_progress: 100 };
+        }
+        // in_progress or enrolled
+        firstAvailableSeen = true;
+        return { ...course, status: "in-progress", course_progress: Number(enrollment.progress_percentage || 0) };
+      }
+      // No enrollment for this course
+      if (!firstAvailableSeen) {
+        firstAvailableSeen = true;
+        return { ...course, status: "available", course_progress: 0 };
+      }
+      return { ...course, status: "locked", course_progress: 0 };
+    });
+
+    sendSuccess(res, {
+      ...path,
+      courses: enrichedCourses,
+      enrolled: !!pathEnroll,
+      progress: pathEnroll ? Number(pathEnroll.progress_percentage) : null,
+      enrollment_status: pathEnroll?.status ?? null,
+      enrolled_at: pathEnroll?.enrolled_at ?? null,
+      completed_at: pathEnroll?.completed_at ?? null,
+    });
   } catch (err) {
     next(err);
   }

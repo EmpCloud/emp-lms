@@ -155,10 +155,13 @@ router.post(
       const userId = req.user!.empcloudUserId;
       const isAdmin = ["super_admin", "org_admin", "hr_admin"].includes(req.user!.role);
 
-      // Verify the requesting user owns this enrollment (or is admin)
+      // Verify the requesting user owns this enrollment (or is admin).
+      // The DB adapter camelizes keys, so user_id → userId. Number()
+      // cast handles mysql2 BigInt vs JWT number mismatch.
       if (!isAdmin) {
         const enrollment = await enrollmentService.getEnrollmentById(orgId, req.params.id);
-        if (enrollment.user_id !== userId) {
+        const enrollUserId = Number(enrollment.userId ?? enrollment.user_id);
+        if (enrollUserId !== Number(userId)) {
           return res.status(403).json({ success: false, error: "You can only complete lessons on your own enrollment" });
         }
       }

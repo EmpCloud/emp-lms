@@ -114,7 +114,7 @@ function ModuleAccordion({
                   {formatDuration(lesson.duration)}
                 </span>
               )}
-              {lesson.completed ? (
+              {lesson.completed || lesson.is_completed || lesson.isCompleted ? (
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
               ) : (
                 <div className="h-4 w-4 rounded-full border-2 border-gray-300" />

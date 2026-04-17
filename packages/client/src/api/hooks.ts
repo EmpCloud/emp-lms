@@ -50,7 +50,10 @@ export function useMarkLessonComplete(enrollmentId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["enrollments"] });
       qc.invalidateQueries({ queryKey: ["enrollments", enrollmentId] });
-      qc.invalidateQueries({ queryKey: ["course"] });
+      // "courses" (plural) matches the useCourse query key so the detail
+      // page + learner runtime refetch with the updated progress.
+      qc.invalidateQueries({ queryKey: ["courses"] });
+      qc.invalidateQueries({ queryKey: ["learning-paths"] });
     },
   });
 }
@@ -76,6 +79,53 @@ export function useLearningPaths(params?: Record<string, any>) {
 }
 export function useLearningPath(id: string) {
   return useQuery({ queryKey: ["learning-paths", id], queryFn: () => apiGet<any>(`/learning-paths/${id}`), enabled: !!id });
+}
+export function useMyPathEnrollments(params?: Record<string, any>) {
+  return useQuery({ queryKey: ["learning-paths", "my", params], queryFn: () => apiGet<any>("/learning-paths/my/enrollments", params) });
+}
+export function useCreateLearningPath() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (d: any) => apiPost<any>("/learning-paths", d), onSuccess: () => qc.invalidateQueries({ queryKey: ["learning-paths"] }) });
+}
+export function useUpdateLearningPath(id: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (d: any) => apiPut<any>(`/learning-paths/${id}`, d), onSuccess: () => qc.invalidateQueries({ queryKey: ["learning-paths"] }) });
+}
+export function usePublishLearningPath() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => apiPost<any>(`/learning-paths/${id}/publish`), onSuccess: () => qc.invalidateQueries({ queryKey: ["learning-paths"] }) });
+}
+export function useDeleteLearningPath() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => apiDelete<any>(`/learning-paths/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: ["learning-paths"] }) });
+}
+export function useAddCourseToPath(pathId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (d: { course_id: string; sort_order?: number; is_mandatory?: boolean }) => apiPost<any>(`/learning-paths/${pathId}/courses`, d),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["learning-paths", pathId] }); qc.invalidateQueries({ queryKey: ["learning-paths"] }); },
+  });
+}
+export function useRemoveCourseFromPath(pathId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (courseId: string) => apiDelete<any>(`/learning-paths/${pathId}/courses/${courseId}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["learning-paths", pathId] }); qc.invalidateQueries({ queryKey: ["learning-paths"] }); },
+  });
+}
+export function useReorderPathCourses(pathId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (courseIds: string[]) => apiPost<any>(`/learning-paths/${pathId}/courses/reorder`, { course_ids: courseIds }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["learning-paths", pathId] }),
+  });
+}
+export function useEnrollInPath() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pathId: string) => apiPost<any>(`/learning-paths/${pathId}/enroll`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["learning-paths"] }); qc.invalidateQueries({ queryKey: ["enrollments"] }); },
+  });
 }
 
 // ── Certifications ────────────────────────────────────────────────────────

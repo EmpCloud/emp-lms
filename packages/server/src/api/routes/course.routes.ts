@@ -162,15 +162,70 @@ router.delete(
 // SINGLE COURSE ROUTES
 // ============================================================================
 
-// GET /courses/:id
+// GET /courses/:id — enriched with the caller's enrollment status so the
+// detail page can show "Continue Learning" vs "Enroll Now".
 router.get(
   "/:id",
   authenticate,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const orgId = req.user!.empcloudOrgId;
+      const userId = req.user!.empcloudUserId;
       const course = await courseService.getCourse(orgId, req.params.id);
-      sendSuccess(res, course);
+
+      // Look up the caller's enrollment for this course
+      const { getDB } = await import("../../db/adapters/index.js");
+      const db = getDB();
+      const enrollRaw: any = await db.raw(
+        `SELECT id, status, progress_percentage, enrolled_at, started_at, completed_at, time_spent_minutes, score
+         FROM enrollments
+         WHERE org_id = ? AND user_id = ? AND course_id = ?
+         LIMIT 1`,
+        [orgId, userId, req.params.id]
+      );
+      const enrollRow = Array.isArray(enrollRaw) && Array.isArray(enrollRaw[0])
+        ? enrollRaw[0][0]
+        : Array.isArray(enrollRaw) ? enrollRaw[0] : null;
+
+      // Enrich lessons with per-user completion status so the detail page
+      // can show green checks next to completed lessons.
+      let lessonProgressMap = new Map<string, boolean>();
+      if (enrollRow) {
+        const lpRaw: any = await db.raw(
+          `SELECT lesson_id, is_completed FROM lesson_progress WHERE enrollment_id = ?`,
+          [enrollRow.id]
+        );
+        const lpRows = Array.isArray(lpRaw) && Array.isArray(lpRaw[0]) ? lpRaw[0] : Array.isArray(lpRaw) ? lpRaw : [];
+        for (const r of lpRows) {
+          if (r.is_completed) lessonProgressMap.set(r.lesson_id, true);
+        }
+      }
+
+      // Stamp is_completed on each lesson inside each module
+      const enrichedModules = (course.modules || []).map((mod: any) => ({
+        ...mod,
+        lessons: (mod.lessons || []).map((lesson: any) => ({
+          ...lesson,
+          is_completed: lessonProgressMap.has(lesson.id),
+        })),
+      }));
+
+      sendSuccess(res, {
+        ...course,
+        modules: enrichedModules,
+        enrollment: enrollRow
+          ? {
+              id: enrollRow.id,
+              status: enrollRow.status,
+              progress: Number(enrollRow.progress_percentage || 0),
+              enrolled_at: enrollRow.enrolled_at,
+              started_at: enrollRow.started_at,
+              completed_at: enrollRow.completed_at,
+              time_spent_minutes: enrollRow.time_spent_minutes,
+              score: enrollRow.score,
+            }
+          : null,
+      });
     } catch (err) {
       next(err);
     }

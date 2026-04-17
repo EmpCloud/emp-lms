@@ -196,7 +196,20 @@ export async function getEnrollmentById(orgId: number, enrollmentId: string) {
   if (!enrollment) {
     throw new NotFoundError("Enrollment", enrollmentId);
   }
-  return enrollment;
+  // The adapter camelizes keys (course_id → courseId) but downstream code
+  // uses both styles. Return both so nothing breaks.
+  return {
+    ...enrollment,
+    course_id: enrollment.courseId ?? enrollment.course_id,
+    user_id: enrollment.userId ?? enrollment.user_id,
+    org_id: enrollment.orgId ?? enrollment.org_id,
+    started_at: enrollment.startedAt ?? enrollment.started_at,
+    completed_at: enrollment.completedAt ?? enrollment.completed_at,
+    enrolled_at: enrollment.enrolledAt ?? enrollment.enrolled_at,
+    last_accessed_at: enrollment.lastAccessedAt ?? enrollment.last_accessed_at,
+    progress_percentage: enrollment.progressPercentage ?? enrollment.progress_percentage,
+    time_spent_minutes: enrollment.timeSpentMinutes ?? enrollment.time_spent_minutes,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -341,12 +354,14 @@ export async function markLessonComplete(
     );
   }
 
-  // Validate lesson exists in the enrolled course
+  // Validate lesson exists in the enrolled course.
+  // The adapter camelizes keys, so course_id → courseId.
+  const courseId = enrollment.courseId ?? enrollment.course_id;
   const lesson = await db.raw<any[]>(
     `SELECT l.* FROM lessons l
      JOIN course_modules m ON m.id = l.module_id
      WHERE l.id = ? AND m.course_id = ?`,
-    [lessonId, enrollment.course_id]
+    [lessonId, courseId]
   );
   if (!lesson || lesson.length === 0) {
     throw new NotFoundError("Lesson", lessonId);
@@ -423,12 +438,15 @@ export async function calculateProgress(enrollmentId: string): Promise<number> {
     return 0;
   }
 
+  // The adapter camelizes: course_id → courseId
+  const courseId = enrollment.courseId ?? enrollment.course_id;
+
   // Count total mandatory lessons
   const totalResult = await db.raw<any[]>(
     `SELECT COUNT(*) AS total FROM lessons l
      JOIN course_modules m ON m.id = l.module_id
      WHERE m.course_id = ? AND l.is_mandatory = true`,
-    [enrollment.course_id]
+    [courseId]
   );
   const totalLessons = totalResult[0]?.total || 0;
 
@@ -445,7 +463,7 @@ export async function calculateProgress(enrollmentId: string): Promise<number> {
        AND lp.is_completed = true
        AND l.is_mandatory = true
        AND m.course_id = ?`,
-    [enrollmentId, enrollment.course_id]
+    [enrollmentId, courseId]
   );
   const completedLessons = completedResult[0]?.total || 0;
 
@@ -466,17 +484,15 @@ export async function calculateProgress(enrollmentId: string): Promise<number> {
 export async function completeEnrollment(orgId: number, enrollmentId: string) {
   const db = getDB();
 
-  const enrollment = await db.findOne<any>("enrollments", {
-    id: enrollmentId,
-    org_id: orgId,
-  });
-  if (!enrollment) {
-    throw new NotFoundError("Enrollment", enrollmentId);
-  }
+  const enrollment = await getEnrollmentById(orgId, enrollmentId);
 
   if (enrollment.status === "completed") {
     throw new BadRequestError("Enrollment is already completed");
   }
+
+  // getEnrollmentById returns dual-key (camelCase + snake_case)
+  const courseId = enrollment.course_id;
+  const userId = enrollment.user_id;
 
   const completedAt = new Date();
 
@@ -489,24 +505,24 @@ export async function completeEnrollment(orgId: number, enrollmentId: string) {
   // Increment course completion count
   await db.raw(
     `UPDATE courses SET completion_count = completion_count + 1 WHERE id = ?`,
-    [enrollment.course_id]
+    [courseId]
   );
 
   lmsEvents.emit("enrollment.completed", {
     enrollmentId,
-    courseId: enrollment.course_id,
-    userId: enrollment.user_id,
+    courseId,
+    userId,
     orgId,
     completedAt,
     score: enrollment.score || undefined,
   });
 
   logger.info(
-    `Enrollment ${enrollmentId} completed for user ${enrollment.user_id} in course ${enrollment.course_id}`
+    `Enrollment ${enrollmentId} completed for user ${userId} in course ${courseId}`
   );
 
   // Check if course has a certificate template configured
-  const course = await db.findById<any>("courses", enrollment.course_id);
+  const course = await db.findById<any>("courses", courseId);
   if (course?.certificate_template_id) {
     // Certificate generation is handled by the certificate service via the event
     logger.info(
