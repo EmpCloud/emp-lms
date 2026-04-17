@@ -113,6 +113,13 @@ export enum ILTAttendanceStatus {
   EXCUSED = "excused",
 }
 
+export enum ComplianceType {
+  POLICY = "policy",
+  TRAINING = "training",
+  DOCUMENT_SUBMISSION = "document_submission",
+  QUIZ = "quiz",
+}
+
 export enum ComplianceAssignedToType {
   ALL = "all",
   DEPARTMENT = "department",

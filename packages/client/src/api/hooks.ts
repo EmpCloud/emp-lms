@@ -143,6 +143,53 @@ export function useComplianceDashboard() {
 export function useComplianceRecords(params?: Record<string, any>) {
   return useQuery({ queryKey: ["compliance", "records", params], queryFn: () => apiGet<any>("/compliance/records", params) });
 }
+export function useComplianceAssignments(params?: Record<string, any>) {
+  return useQuery({ queryKey: ["compliance", "assignments", params], queryFn: () => apiGet<any>("/compliance/assignments", params) });
+}
+export function useCreateComplianceAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (d: any) => apiPost<any>("/compliance/assignments", d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["compliance"] });
+    },
+  });
+}
+export function useUpdateComplianceAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...d }: { id: string; [k: string]: any }) =>
+      apiPut<any>(`/compliance/assignments/${id}`, d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["compliance"] });
+    },
+  });
+}
+export function useDeactivateComplianceAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiPost<any>(`/compliance/assignments/${id}/deactivate`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["compliance"] });
+    },
+  });
+}
+export function useAcceptPolicy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (d: { course_id: string; enrollment_id?: string; policy_version?: number }) =>
+      apiPost<any>("/compliance/policy-accept", d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["compliance"] });
+    },
+  });
+}
+export function usePolicyAcceptances(courseId?: string) {
+  return useQuery({
+    queryKey: ["compliance", "policy-acceptances", courseId],
+    queryFn: () => apiGet<any>("/compliance/policy-acceptances", courseId ? { course_id: courseId } : undefined),
+  });
+}
 
 // ── ILT Sessions ──────────────────────────────────────────────────────────
 export function useILTSessions(params?: Record<string, any>) {

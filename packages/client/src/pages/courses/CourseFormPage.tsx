@@ -4,7 +4,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import toast from "react-hot-toast";
-import { BookOpen, ArrowLeft, Save, Loader2 } from "lucide-react";
+import { BookOpen, ArrowLeft, Save, Loader2, ShieldCheck } from "lucide-react";
 import { useCourse, useCreateCourse, useUpdateCourse, useCategories } from "@/api/hooks";
 import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,9 @@ const courseSchema = z.object({
   duration: z.coerce.number().min(1, "Duration must be at least 1 minute"),
   is_mandatory: z.boolean().default(false),
   is_featured: z.boolean().default(false),
+  is_compliance: z.boolean().default(false),
+  compliance_type: z.enum(["policy", "training", "document_submission", "quiz"]).nullable().optional(),
+  compliance_code: z.string().max(50).optional().or(z.literal("")),
   tags: z.string().optional().or(z.literal("")),
   passing_score: z.coerce
     .number()
@@ -88,6 +91,7 @@ export default function CourseFormPage() {
     handleSubmit,
     reset,
     control,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<CourseFormData>({
     resolver: zodResolver(courseSchema),
@@ -100,6 +104,9 @@ export default function CourseFormPage() {
       duration: 0,
       is_mandatory: false,
       is_featured: false,
+      is_compliance: false,
+      compliance_type: null,
+      compliance_code: "",
       tags: "",
       passing_score: 70,
       thumbnail_url: "",
@@ -119,6 +126,9 @@ export default function CourseFormPage() {
         duration: c.duration ?? 0,
         is_mandatory: Boolean(c.isMandatory ?? c.is_mandatory ?? false),
         is_featured: Boolean(c.isFeatured ?? c.is_featured ?? false),
+        is_compliance: Boolean(c.isCompliance ?? c.is_compliance ?? false),
+        compliance_type: c.complianceType ?? c.compliance_type ?? null,
+        compliance_code: c.complianceCode ?? c.compliance_code ?? "",
         tags: Array.isArray(c.tags) ? c.tags.join(", ") : c.tags ?? "",
         passing_score: c.passingScore ?? c.passing_score ?? 70,
         thumbnail_url: c.thumbnailUrl ?? c.thumbnail_url ?? "",
@@ -328,6 +338,53 @@ export default function CourseFormPage() {
               </label>
             )}
           />
+        </div>
+
+        {/* ── Compliance Section ──────────────────────────────────────── */}
+        <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4.5 w-4.5 text-indigo-600" />
+            <span className="text-sm font-semibold text-gray-800">Compliance Settings</span>
+          </div>
+
+          <Controller
+            control={control}
+            name="is_compliance"
+            render={({ field }) => (
+              <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={Boolean(field.value)}
+                  onChange={(e) => field.onChange(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-gray-700">This is a compliance course</span>
+              </label>
+            )}
+          />
+
+          {watch("is_compliance") && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Compliance Type" error={errors.compliance_type?.message}>
+                <select {...register("compliance_type")} className={inputCls}>
+                  <option value="">Select type</option>
+                  <option value="policy">Policy (Accept terms)</option>
+                  <option value="training">Training (Complete course)</option>
+                  <option value="document_submission">Document Submission (Upload file)</option>
+                  <option value="quiz">Quiz (Pass assessment)</option>
+                </select>
+              </Field>
+
+              <Field label="Compliance Code" error={errors.compliance_code?.message}>
+                <input
+                  {...register("compliance_code")}
+                  className={inputCls}
+                  placeholder="e.g. GDPR-2024, SOC2-T1"
+                  maxLength={50}
+                />
+              </Field>
+            </div>
+          )}
         </div>
 
         {/* Submit */}
