@@ -158,12 +158,14 @@ export async function getCertificate(orgId: number, certificateId: string) {
   if (!certificate) {
     throw new NotFoundError("Certificate", certificateId);
   }
-  if (certificate.org_id !== orgId) {
+  // Adapter camelizes: org_id → orgId, course_id → courseId
+  const certOrgId = Number(certificate.orgId ?? certificate.org_id);
+  if (certOrgId !== orgId) {
     throw new ForbiddenError("Certificate does not belong to your organization");
   }
 
-  // Enrich with course info
-  const course = await db.findById<any>("courses", certificate.course_id);
+  const courseId = certificate.courseId ?? certificate.course_id;
+  const course = await db.findById<any>("courses", courseId);
 
   return {
     ...certificate,
