@@ -2,6 +2,7 @@ import { Award, AlertTriangle, XCircle, Loader2, ShieldCheck } from "lucide-reac
 import dayjs from "dayjs";
 import { useMyCertificates } from "@/api/hooks";
 import CertificateDownload from "@/components/lms/CertificateDownload";
+import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 
 function statusBadge(status: string) {
   switch (status) {
@@ -34,6 +35,8 @@ function isExpiringSoon(expiryDate: string | null) {
 }
 
 export default function CertificationsPage() {
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = isAdminRole(user?.role);
   const { data, isLoading } = useMyCertificates();
   const certificates: any[] = data?.data ?? [];
 
@@ -108,7 +111,7 @@ export default function CertificationsPage() {
               </dl>
 
               <div className="mt-4">
-                <CertificateDownload certificateId={cert.id} />
+                <CertificateDownload certificateId={cert.id} showVerify={isAdmin} />
               </div>
             </div>
           ))}

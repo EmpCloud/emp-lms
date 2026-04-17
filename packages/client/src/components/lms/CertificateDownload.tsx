@@ -15,42 +15,30 @@ interface VerifyResult {
 interface CertificateDownloadProps {
   certificateId: string;
   className?: string;
+  // When false (default for employees), the Verify button is hidden.
+  // Admins pass showVerify={true} from the certifications page.
+  showVerify?: boolean;
 }
 
-export default function CertificateDownload({ certificateId, className = "" }: CertificateDownloadProps) {
+export default function CertificateDownload({ certificateId, className = "", showVerify = false }: CertificateDownloadProps) {
   const [downloading, setDownloading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
-  const [showVerify, setShowVerify] = useState(false);
+  const [showVerifyResult, setShowVerifyResult] = useState(false);
 
-  const handleDownload = async () => {
-    setDownloading(true);
-    try {
-      const response = await api.get(`/certificates/${certificateId}/pdf`, {
-        responseType: "blob",
-      });
-
-      const blob = new Blob([response.data], { type: "application/pdf" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `certificate-${certificateId}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success("Certificate downloaded");
-    } catch {
-      toast.error("Failed to download certificate");
-    } finally {
-      setDownloading(false);
-    }
+  // Opens the certificate in a new tab. The server renders the HTML template
+  // with learner/course data filled in. The user can then Ctrl+P → Save as PDF
+  // or print directly. When server-side PDF generation is configured (Phase 2),
+  // this will download a real PDF instead.
+  const handleDownload = () => {
+    const token = localStorage.getItem("access_token");
+    const url = `/api/v1/certificates/${certificateId}/download${token ? `?token=${token}` : ""}`;
+    window.open(url, "_blank");
   };
 
   const handleVerify = async () => {
     setVerifying(true);
-    setShowVerify(true);
+    setShowVerifyResult(true);
     try {
       const res = await apiGet<VerifyResult>(`/certificates/${certificateId}/verify`);
       if (res.success && res.data) {
@@ -67,7 +55,7 @@ export default function CertificateDownload({ certificateId, className = "" }: C
   };
 
   const closeVerify = () => {
-    setShowVerify(false);
+    setShowVerifyResult(false);
     setVerifyResult(null);
   };
 
@@ -88,23 +76,16 @@ export default function CertificateDownload({ certificateId, className = "" }: C
           Download
         </button>
 
-        {/* Print button — opens the certificate HTML in a new window and
-            triggers the browser print dialog. */}
+        {/* Print button — opens the certificate and triggers browser print */}
         <button
-          onClick={async () => {
-            try {
-              const response = await api.get(`/certificates/${certificateId}/download`, {
-                responseType: "text",
+          onClick={() => {
+            const token = localStorage.getItem("access_token");
+            const url = `/api/v1/certificates/${certificateId}/download${token ? `?token=${token}` : ""}`;
+            const win = window.open(url, "_blank", "width=900,height=700");
+            if (win) {
+              win.addEventListener("load", () => {
+                setTimeout(() => win.print(), 300);
               });
-              const html = typeof response.data === "string" ? response.data : response.data?.html || "";
-              const win = window.open("", "_blank", "width=900,height=700");
-              if (win) {
-                win.document.write(html || "<p>Certificate preview not available</p>");
-                win.document.close();
-                setTimeout(() => win.print(), 500);
-              }
-            } catch {
-              toast.error("Failed to load certificate for printing");
             }
           }}
           className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
@@ -113,23 +94,25 @@ export default function CertificateDownload({ certificateId, className = "" }: C
           Print
         </button>
 
-        {/* Verify button */}
-        <button
-          onClick={handleVerify}
-          disabled={verifying && showVerify}
-          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
-        >
-          {verifying ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <ShieldCheck className="h-3.5 w-3.5" />
-          )}
-          Verify
-        </button>
+        {/* Verify button — admin only */}
+        {showVerify && (
+          <button
+            onClick={handleVerify}
+            disabled={verifying}
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+          >
+            {verifying ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ShieldCheck className="h-3.5 w-3.5" />
+            )}
+            Verify
+          </button>
+        )}
       </div>
 
       {/* Verification result card */}
-      {showVerify && (
+      {showVerifyResult && (
         <div className="absolute left-0 right-0 top-full z-10 mt-2 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
           {verifying ? (
             <div className="flex items-center justify-center py-3">
