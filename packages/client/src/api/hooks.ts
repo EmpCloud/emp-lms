@@ -148,6 +148,19 @@ export function useMyStreak() {
 export function useMarketplace(params?: Record<string, any>) {
   return useQuery({ queryKey: ["marketplace", params], queryFn: () => apiGet<any>("/marketplace", params) });
 }
+export function useImportMarketplaceItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { itemId: string; courseId: string; moduleId: string }) =>
+      apiPost<any>(`/marketplace/${args.itemId}/import`, {
+        courseId: args.courseId,
+        moduleId: args.moduleId,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["courses"] });
+    },
+  });
+}
 
 // ── Categories ────────────────────────────────────────────────────────────
 export function useCategories() {
