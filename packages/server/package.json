@@ -11,6 +11,8 @@
     "test:coverage": "vitest run --coverage",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
+    "db:seed:leaderboard": "tsx src/db/seed-leaderboard.ts",
+    "db:seed:marketplace": "tsx src/db/seed-marketplace.ts",
     "db:rollback": "tsx src/db/rollback.ts"
   },
   "dependencies": {

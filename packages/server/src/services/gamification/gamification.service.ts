@@ -5,6 +5,7 @@
 
 import { v4 as uuidv4 } from "uuid";
 import { getDB } from "../../db/adapters/index";
+import { getEmpCloudDB } from "../../db/empcloud";
 import { config } from "../../config/index";
 import { logger } from "../../utils/logger";
 import { NotFoundError } from "../../utils/errors";
@@ -235,8 +236,11 @@ export async function getUserPoints(
     user_id: userId,
   });
 
+  const localPoints = profile
+    ? profile.totalPointsEarned ?? profile.total_points_earned ?? 0
+    : 0;
   return {
-    points: profile ? profile.total_points_earned || 0 : 0,
+    points: localPoints,
     source: "local",
   };
 }
@@ -266,7 +270,87 @@ export async function getLeaderboard(
     [orgId, limit]
   );
 
-  return leaders;
+  if (!leaders.length) return [];
+
+  // Enrich with user names/photos from EmpCloud DB (cross-DB, can't JOIN)
+  const userIds = leaders.map((l) => l.user_id);
+  let userMap = new Map<number, { first_name: string; last_name: string; email: string; photo_path: string | null }>();
+  try {
+    const empDb = getEmpCloudDB();
+    const users = await empDb("users")
+      .select("id", "first_name", "last_name", "email", "photo_path")
+      .whereIn("id", userIds);
+    userMap = new Map(users.map((u: any) => [u.id, u]));
+  } catch (err: any) {
+    logger.warn(`Leaderboard: EmpCloud user lookup failed: ${err.message}`);
+  }
+
+  return leaders.map((l, idx) => {
+    const u = userMap.get(l.user_id);
+    const name = u
+      ? `${u.first_name ?? ""} ${u.last_name ?? ""}`.trim() || u.email || `User #${l.user_id}`
+      : `User #${l.user_id}`;
+    return {
+      rank: idx + 1,
+      userId: l.user_id,
+      name,
+      email: u?.email ?? null,
+      photoPath: u?.photo_path ?? null,
+      points: l.total_points_earned || 0,
+      coursesCompleted: l.total_courses_completed || 0,
+      timeSpentMinutes: l.total_time_spent_minutes || 0,
+      streak: l.current_streak_days || 0,
+      longestStreak: l.longest_streak_days || 0,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Get Current User's Leaderboard Stats (points + rank + streak)
+// ---------------------------------------------------------------------------
+
+export async function getMyLeaderboardStats(
+  orgId: number,
+  userId: number
+): Promise<{
+  totalPoints: number;
+  points: number;
+  rank: number | null;
+  streak: number;
+  longestStreak: number;
+  coursesCompleted: number;
+  source: string;
+}> {
+  const db = getDB();
+
+  const pts = await getUserPoints(orgId, userId);
+
+  const profile = await db.findOne<any>("user_learning_profiles", {
+    org_id: orgId,
+    user_id: userId,
+  });
+
+  // Rank = 1 + count of users in the same org with strictly more points
+  let rank: number | null = null;
+  if (profile) {
+    const [countRow] = await db.raw<any[]>(
+      `SELECT COUNT(*) AS ahead
+         FROM user_learning_profiles
+         WHERE org_id = ? AND total_points_earned > ?`,
+      [orgId, pts.points || 0]
+    );
+    rank = Number(countRow?.ahead ?? 0) + 1;
+  }
+
+  return {
+    totalPoints: pts.points,
+    points: pts.points,
+    rank,
+    streak: profile?.currentStreakDays ?? profile?.current_streak_days ?? 0,
+    longestStreak: profile?.longestStreakDays ?? profile?.longest_streak_days ?? 0,
+    coursesCompleted: profile?.totalCoursesCompleted ?? profile?.total_courses_completed ?? 0,
+    source: pts.source,
+  };
 }
 
 // ---------------------------------------------------------------------------

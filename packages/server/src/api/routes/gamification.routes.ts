@@ -89,7 +89,7 @@ router.get(
   }
 );
 
-// GET /gamification/my/points — Get current user's points
+// GET /gamification/my/points — Get current user's points + rank + streak
 router.get(
   "/my/points",
   async (req: Request, res: Response, next: NextFunction) => {
@@ -97,7 +97,7 @@ router.get(
       const orgId = req.user!.empcloudOrgId;
       const userId = req.user!.empcloudUserId;
 
-      const result = await gamificationService.getUserPoints(orgId, userId);
+      const result = await gamificationService.getMyLeaderboardStats(orgId, userId);
       sendSuccess(res, result);
     } catch (err) {
       next(err);
