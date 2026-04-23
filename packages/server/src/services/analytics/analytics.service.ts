@@ -17,6 +17,9 @@ export async function getOverviewDashboard(orgId: number): Promise<any> {
 
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+  sixMonthsAgo.setDate(1);
 
   const [
     totalCoursesResult,
@@ -24,8 +27,11 @@ export async function getOverviewDashboard(orgId: number): Promise<any> {
     completedEnrollmentsResult,
     activeLearnersResult,
     avgRatingResult,
+    avgScoreResult,
     totalTimeResult,
     totalCertificatesResult,
+    completionTrendResult,
+    topCoursesResult,
   ] = await Promise.all([
     db.raw<any[]>(
       `SELECT COUNT(*) AS total FROM courses WHERE org_id = ? AND status != 'archived'`,
@@ -48,6 +54,10 @@ export async function getOverviewDashboard(orgId: number): Promise<any> {
       [orgId]
     ),
     db.raw<any[]>(
+      `SELECT AVG(score) AS avg_score FROM enrollments WHERE org_id = ? AND score IS NOT NULL AND score > 0`,
+      [orgId]
+    ),
+    db.raw<any[]>(
       `SELECT SUM(time_spent_minutes) AS total_time FROM enrollments WHERE org_id = ?`,
       [orgId]
     ),
@@ -55,26 +65,111 @@ export async function getOverviewDashboard(orgId: number): Promise<any> {
       `SELECT COUNT(*) AS total FROM certificates WHERE org_id = ?`,
       [orgId]
     ),
+    // Completion trend: monthly completions over last 6 months
+    db.raw<any[]>(
+      `SELECT DATE_FORMAT(completed_at, '%Y-%m') AS month,
+              COUNT(*) AS completions
+       FROM enrollments
+       WHERE org_id = ? AND status = 'completed' AND completed_at >= ?
+       GROUP BY month
+       ORDER BY month ASC`,
+      [orgId, sixMonthsAgo.toISOString()]
+    ),
+    // Top 5 courses by enrollment count
+    db.raw<any[]>(
+      `SELECT c.id, c.title,
+              COUNT(e.id) AS enrollments,
+              SUM(CASE WHEN e.status = 'completed' THEN 1 ELSE 0 END) AS completions
+       FROM courses c
+       LEFT JOIN enrollments e ON e.course_id = c.id
+       WHERE c.org_id = ? AND c.status != 'archived'
+       GROUP BY c.id, c.title
+       ORDER BY enrollments DESC
+       LIMIT 5`,
+      [orgId]
+    ),
   ]);
 
-  const totalCourses = totalCoursesResult[0]?.total || 0;
-  const totalEnrollments = totalEnrollmentsResult[0]?.total || 0;
-  const completedEnrollments = completedEnrollmentsResult[0]?.total || 0;
+  const totalCourses = Number(totalCoursesResult[0]?.total) || 0;
+  const totalEnrollments = Number(totalEnrollmentsResult[0]?.total) || 0;
+  const completedEnrollments = Number(completedEnrollmentsResult[0]?.total) || 0;
   const completionRate =
     totalEnrollments > 0
       ? Math.round((completedEnrollments / totalEnrollments) * 100)
       : 0;
+  const activeLearners = Number(activeLearnersResult[0]?.total) || 0;
+  const avgScore = Math.round(Number(avgScoreResult[0]?.avg_score) || 0);
+  const avgRating = Math.round((Number(avgRatingResult[0]?.avg_rating) || 0) * 100) / 100;
 
+  // Format chart data for Recharts
+  const completionTrend = (completionTrendResult ?? []).map((r: any) => ({
+    month: r.month,
+    completions: Number(r.completions) || 0,
+  }));
+
+  const topCourses = (topCoursesResult ?? []).map((r: any) => ({
+    id: r.id,
+    title: r.title,
+    // Chart libraries typically use `name` as the label field
+    name: r.title,
+    enrollments: Number(r.enrollments) || 0,
+    completions: Number(r.completions) || 0,
+  }));
+
+  // Enrollment by department: cross-DB query; wrapped so a permission
+  // issue doesn't nuke the whole dashboard.
+  let enrollmentByDepartment: any[] = [];
+  try {
+    const { getEmpCloudDB } = await import("../../db/empcloud");
+    const empDb = getEmpCloudDB();
+    const empDbName =
+      (empDb as any).client?.config?.connection?.database || "empcloud";
+    const deptRows = await db.raw<any[]>(
+      `SELECT u.department_id,
+              COUNT(DISTINCT e.id) AS count
+       FROM enrollments e
+       LEFT JOIN (SELECT id, department_id FROM ${empDbName}.users WHERE org_id = ?) u
+         ON u.id = e.user_id
+       WHERE e.org_id = ?
+       GROUP BY u.department_id`,
+      [orgId, orgId]
+    );
+    enrollmentByDepartment = (deptRows ?? [])
+      .filter((r: any) => r.department_id)
+      .map((r: any) => ({
+        department: `Dept ${r.department_id}`,
+        count: Number(r.count) || 0,
+      }));
+  } catch (err) {
+    logger.warn("Analytics enrollment-by-department query failed", err);
+  }
+
+  // Return BOTH camelCase (AnalyticsPage) AND snake_case (legacy DashboardPage)
+  // keys so existing consumers keep working.
   return {
+    // camelCase
+    totalCourses,
+    totalEnrollments,
+    completedEnrollments,
+    completionRate,
+    activeLearners,
+    avgScore,
+    avgCourseRating: avgRating,
+    totalTimeSpentMinutes: Number(totalTimeResult[0]?.total_time) || 0,
+    totalCertificatesIssued: Number(totalCertificatesResult[0]?.total) || 0,
+    completionTrend,
+    topCourses,
+    enrollmentByDepartment,
+    // snake_case (legacy)
     total_courses: totalCourses,
     total_enrollments: totalEnrollments,
     completed_enrollments: completedEnrollments,
     completion_rate: completionRate,
-    active_learners_30d: activeLearnersResult[0]?.total || 0,
-    avg_course_rating:
-      Math.round((avgRatingResult[0]?.avg_rating || 0) * 100) / 100,
-    total_time_spent_minutes: totalTimeResult[0]?.total_time || 0,
-    total_certificates_issued: totalCertificatesResult[0]?.total || 0,
+    active_learners_30d: activeLearners,
+    avg_course_rating: avgRating,
+    total_time_spent_minutes: Number(totalTimeResult[0]?.total_time) || 0,
+    total_certificates_issued: Number(totalCertificatesResult[0]?.total) || 0,
+    completion_by_month: completionTrend,
   };
 }
 

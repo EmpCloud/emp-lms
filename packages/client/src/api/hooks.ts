@@ -50,7 +50,10 @@ export function useMarkLessonComplete(enrollmentId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["enrollments"] });
       qc.invalidateQueries({ queryKey: ["enrollments", enrollmentId] });
-      qc.invalidateQueries({ queryKey: ["course"] });
+      // "courses" (plural) matches the useCourse query key so the detail
+      // page + learner runtime refetch with the updated progress.
+      qc.invalidateQueries({ queryKey: ["courses"] });
+      qc.invalidateQueries({ queryKey: ["learning-paths"] });
     },
   });
 }
@@ -77,10 +80,65 @@ export function useLearningPaths(params?: Record<string, any>) {
 export function useLearningPath(id: string) {
   return useQuery({ queryKey: ["learning-paths", id], queryFn: () => apiGet<any>(`/learning-paths/${id}`), enabled: !!id });
 }
+export function useMyPathEnrollments(params?: Record<string, any>) {
+  return useQuery({ queryKey: ["learning-paths", "my", params], queryFn: () => apiGet<any>("/learning-paths/my/enrollments", params) });
+}
+export function useCreateLearningPath() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (d: any) => apiPost<any>("/learning-paths", d), onSuccess: () => qc.invalidateQueries({ queryKey: ["learning-paths"] }) });
+}
+export function useUpdateLearningPath(id: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (d: any) => apiPut<any>(`/learning-paths/${id}`, d), onSuccess: () => qc.invalidateQueries({ queryKey: ["learning-paths"] }) });
+}
+export function usePublishLearningPath() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => apiPost<any>(`/learning-paths/${id}/publish`), onSuccess: () => qc.invalidateQueries({ queryKey: ["learning-paths"] }) });
+}
+export function useDeleteLearningPath() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => apiDelete<any>(`/learning-paths/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: ["learning-paths"] }) });
+}
+export function useAddCourseToPath(pathId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (d: { course_id: string; sort_order?: number; is_mandatory?: boolean }) => apiPost<any>(`/learning-paths/${pathId}/courses`, d),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["learning-paths", pathId] }); qc.invalidateQueries({ queryKey: ["learning-paths"] }); },
+  });
+}
+export function useRemoveCourseFromPath(pathId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (courseId: string) => apiDelete<any>(`/learning-paths/${pathId}/courses/${courseId}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["learning-paths", pathId] }); qc.invalidateQueries({ queryKey: ["learning-paths"] }); },
+  });
+}
+export function useReorderPathCourses(pathId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (courseIds: string[]) => apiPost<any>(`/learning-paths/${pathId}/courses/reorder`, { course_ids: courseIds }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["learning-paths", pathId] }),
+  });
+}
+export function useEnrollInPath() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pathId: string) => apiPost<any>(`/learning-paths/${pathId}/enroll`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["learning-paths"] }); qc.invalidateQueries({ queryKey: ["enrollments"] }); },
+  });
+}
 
 // ── Certifications ────────────────────────────────────────────────────────
 export function useMyCertificates(params?: Record<string, any>) {
   return useQuery({ queryKey: ["certificates", "my", params], queryFn: () => apiGet<any>("/certificates/my", params) });
+}
+export function useAllCertificates(params?: Record<string, any>) {
+  return useQuery({ queryKey: ["certificates", "all", params], queryFn: () => apiGet<any>("/certificates/admin/all", params) });
+}
+export function useVerifyCertificateByNumber() {
+  return useMutation({
+    mutationFn: (certNumber: string) => apiGet<any>(`/certificates/verify/${encodeURIComponent(certNumber)}`),
+  });
 }
 
 // ── Compliance ────────────────────────────────────────────────────────────
@@ -92,6 +150,53 @@ export function useComplianceDashboard() {
 }
 export function useComplianceRecords(params?: Record<string, any>) {
   return useQuery({ queryKey: ["compliance", "records", params], queryFn: () => apiGet<any>("/compliance/records", params) });
+}
+export function useComplianceAssignments(params?: Record<string, any>) {
+  return useQuery({ queryKey: ["compliance", "assignments", params], queryFn: () => apiGet<any>("/compliance/assignments", params) });
+}
+export function useCreateComplianceAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (d: any) => apiPost<any>("/compliance/assignments", d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["compliance"] });
+    },
+  });
+}
+export function useUpdateComplianceAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...d }: { id: string; [k: string]: any }) =>
+      apiPut<any>(`/compliance/assignments/${id}`, d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["compliance"] });
+    },
+  });
+}
+export function useDeactivateComplianceAssignment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiPost<any>(`/compliance/assignments/${id}/deactivate`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["compliance"] });
+    },
+  });
+}
+export function useAcceptPolicy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (d: { course_id: string; enrollment_id?: string; policy_version?: number }) =>
+      apiPost<any>("/compliance/policy-accept", d),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["compliance"] });
+    },
+  });
+}
+export function usePolicyAcceptances(courseId?: string) {
+  return useQuery({
+    queryKey: ["compliance", "policy-acceptances", courseId],
+    queryFn: () => apiGet<any>("/compliance/policy-acceptances", courseId ? { course_id: courseId } : undefined),
+  });
 }
 
 // ── ILT Sessions ──────────────────────────────────────────────────────────

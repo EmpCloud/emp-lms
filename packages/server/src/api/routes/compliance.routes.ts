@@ -22,7 +22,7 @@ router.get(
     try {
       const orgId = req.user!.empcloudOrgId;
       const userId = req.user!.empcloudUserId;
-      const { page, limit } = req.query;
+      const { page, limit, status } = req.query;
 
       const result = await complianceService.getUserComplianceRecords(
         orgId,
@@ -30,6 +30,7 @@ router.get(
         {
           page: page ? Number(page) : undefined,
           limit: limit ? Number(limit) : undefined,
+          status: status as string | undefined,
         }
       );
 
@@ -172,7 +173,7 @@ router.get(
     try {
       const orgId = req.user!.empcloudOrgId;
       const userId = req.user!.empcloudUserId;
-      const { page, limit } = req.query;
+      const { page, limit, status } = req.query;
 
       const result = await complianceService.getUserComplianceRecords(
         orgId,
@@ -180,6 +181,7 @@ router.get(
         {
           page: page ? Number(page) : undefined,
           limit: limit ? Number(limit) : undefined,
+          status: status as string | undefined,
         }
       );
 
@@ -230,6 +232,47 @@ router.put(
         status
       );
       sendSuccess(res, record);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ---- Policy Acceptance ----
+
+// POST /compliance/policy-accept — employee accepts a policy
+router.post(
+  "/policy-accept",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = req.user!.empcloudOrgId;
+      const userId = req.user!.empcloudUserId;
+      const acceptance = await complianceService.acceptPolicy(orgId, userId, {
+        ...req.body,
+        ip_address: req.ip || req.headers["x-forwarded-for"] as string,
+        user_agent: req.headers["user-agent"],
+      });
+      sendSuccess(res, acceptance, 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /compliance/policy-acceptances — get current user's policy acceptances
+router.get(
+  "/policy-acceptances",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const orgId = req.user!.empcloudOrgId;
+      const userId = req.user!.empcloudUserId;
+      const courseId = req.query.course_id as string | undefined;
+      const acceptances = await complianceService.getUserPolicyAcceptances(
+        orgId,
+        userId,
+        courseId
+      );
+      sendSuccess(res, acceptances);
     } catch (err) {
       next(err);
     }

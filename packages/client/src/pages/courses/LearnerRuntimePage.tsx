@@ -53,6 +53,27 @@ export default function LearnerRuntimePage() {
 
   const markComplete = useMarkLessonComplete(enrollment?.id ?? "");
 
+  // Client-side derived "completed" set — MUST be declared before any early
+  // return so React's hook order stays stable across renders (fixes the
+  // "change in the order of Hooks" error).
+  const [completedIds, setCompletedIds] = useState<Set<string>>(() => new Set<string>());
+
+  // Merge server-reported completion status into the local set. Uses merge
+  // (additive) instead of replace so optimistic updates from handleComplete
+  // aren't wiped when react-query refetches after invalidation. The API
+  // doesn't always return is_completed per lesson, so any IDs already in
+  // the set from a successful mark-complete call are preserved.
+  useEffect(() => {
+    if (lessons.length === 0) return;
+    setCompletedIds((prev) => {
+      const merged = new Set(prev);
+      for (const l of lessons) {
+        if (l.is_completed || l.isCompleted) merged.add(l.id);
+      }
+      return merged;
+    });
+  }, [lessons]);
+
   // Guard: unenrolled users bounce back to the detail page where they can enroll.
   if (!isLoading && course && !enrollment) {
     return <Navigate to={`/courses/${courseId}`} replace />;
@@ -82,16 +103,6 @@ export default function LearnerRuntimePage() {
   const activeLesson = lessons.find((l: any) => l.id === activeLessonId);
   const activeIdx = lessons.findIndex((l: any) => l.id === activeLessonId);
   const nextLesson = activeIdx >= 0 && activeIdx < lessons.length - 1 ? lessons[activeIdx + 1] : null;
-
-  // Client-side derived "completed" set — we optimistically update on success
-  // so the sidebar reflects progress without a full refetch flicker.
-  const [completedIds, setCompletedIds] = useState<Set<string>>(() => {
-    const set = new Set<string>();
-    for (const l of lessons) {
-      if (l.is_completed || l.isCompleted) set.add(l.id);
-    }
-    return set;
-  });
 
   const handleComplete = (lessonId: string, timeSpentSec?: number) => {
     if (!enrollment?.id) return;

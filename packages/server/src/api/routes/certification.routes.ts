@@ -149,6 +149,29 @@ router.get(
   }
 );
 
+// GET /certificates/admin/all — list all org certificates (admin only)
+router.get(
+  "/admin/all",
+  authenticate,
+  authorize(...ADMIN_ROLES),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { page, limit, status } = req.query;
+      const result = await certService.getAllOrgCertificates(
+        req.user!.empcloudOrgId,
+        {
+          page: page ? Number(page) : undefined,
+          limit: limit ? Number(limit) : undefined,
+          status: status as string | undefined,
+        }
+      );
+      sendSuccess(res, result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // GET /certificates/course/:courseId — all certificates for a course
 router.get(
   "/course/:courseId",
@@ -190,6 +213,21 @@ router.post(
         template_id
       );
       sendSuccess(res, certificate, 201);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /certificates/:id/verify — verify a specific certificate by ID (authenticated)
+// Must be declared before the bare /:id route so it doesn't get swallowed.
+router.get(
+  "/:id/verify",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await certService.verifyCertificateById(req.params.id);
+      sendSuccess(res, result);
     } catch (err) {
       next(err);
     }
@@ -262,24 +300,80 @@ router.get(
         req.params.id
       );
 
-      if (!certificate.pdf_url) {
-        throw new NotFoundError("Certificate PDF");
+      // If a pre-generated PDF exists, serve it directly.
+      if (certificate.pdf_url || certificate.pdfUrl) {
+        const pdfPath = certificate.pdf_url || certificate.pdfUrl;
+        const filePath = path.resolve(process.cwd(), pdfPath.replace(/^\//, ""));
+
+        if (fs.existsSync(filePath)) {
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="${certificate.certificate_number || certificate.certificateNumber}.pdf"`
+          );
+          const fileStream = fs.createReadStream(filePath);
+          return fileStream.pipe(res);
+        }
       }
 
-      const filePath = path.resolve(process.cwd(), certificate.pdf_url.replace(/^\//, ""));
+      // Fallback: render the HTML certificate template inline so the user
+      // can print-to-PDF from the browser. This covers local dev where
+      // Puppeteer isn't configured for server-side PDF generation.
+      const certNumber = certificate.certificate_number || certificate.certificateNumber || "N/A";
+      const issuedAt = certificate.issued_at || certificate.issuedAt;
+      const issuedDate = issuedAt ? new Date(issuedAt).toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" }) : "N/A";
 
-      if (!fs.existsSync(filePath)) {
-        throw new NotFoundError("Certificate PDF file");
+      // Load template if available
+      const templateId = certificate.template_id || certificate.templateId;
+      let html = "";
+      if (templateId) {
+        const { getDB } = await import("../../db/adapters/index.js");
+        const db = getDB();
+        const tmpl = await db.findById<any>("certificate_templates", templateId);
+        if (tmpl) {
+          const rawHtml = tmpl.htmlTemplate || tmpl.html_template || "";
+          // Look up learner name from EmpCloud users
+          const userId = Number(certificate.user_id || certificate.userId);
+          const { findUserById } = await import("../../db/empcloud.js");
+          const learner = await findUserById(userId);
+          const learnerName = learner ? `${learner.first_name} ${learner.last_name}` : "Learner";
+
+          // Look up course title
+          const courseId = certificate.course_id || certificate.courseId;
+          const course = courseId ? await db.findById<any>("courses", courseId) : null;
+          const courseTitle = course?.title || "Course";
+
+          // Look up org name
+          const { getEmpCloudDB } = await import("../../db/empcloud.js");
+          const ecDb = getEmpCloudDB();
+          const org = await ecDb("organizations").where({ id: certificate.org_id || certificate.orgId || req.user!.empcloudOrgId }).first();
+          const orgName = org?.name || "Organization";
+
+          html = rawHtml
+            .replace(/\{\{learner_name\}\}/g, learnerName)
+            .replace(/\{\{course_title\}\}/g, courseTitle)
+            .replace(/\{\{issued_date\}\}/g, issuedDate)
+            .replace(/\{\{certificate_number\}\}/g, certNumber)
+            .replace(/\{\{org_name\}\}/g, orgName);
+        }
       }
 
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${certificate.certificate_number}.pdf"`
-      );
+      if (!html) {
+        html = `<div style="text-align:center;padding:60px;font-family:Georgia,serif;">
+          <h1>Certificate of Completion</h1>
+          <p>Certificate #${certNumber}</p>
+          <p>Issued: ${issuedDate}</p>
+        </div>`;
+      }
 
-      const fileStream = fs.createReadStream(filePath);
-      fileStream.pipe(res);
+      const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Certificate ${certNumber}</title>
+        <style>@media print { body { margin: 0; } @page { size: landscape; margin: 0; } }</style>
+      </head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f9fafb;">
+        ${html}
+      </body></html>`;
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(fullHtml);
     } catch (err) {
       next(err);
     }

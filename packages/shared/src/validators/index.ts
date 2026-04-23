@@ -15,6 +15,7 @@ import {
   ILTSessionStatus,
   ILTAttendanceStatus,
   ComplianceAssignedToType,
+  ComplianceType,
 } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -56,6 +57,10 @@ export const createCourseSchema = z.object({
   passing_score: z.number().int().min(0).max(100).default(70),
   certificate_template_id: z.string().uuid().optional(),
   metadata: z.record(z.unknown()).optional(),
+  // Compliance fields (Phase 1)
+  is_compliance: z.boolean().default(false),
+  compliance_type: z.nativeEnum(ComplianceType).nullable().optional(),
+  compliance_code: z.string().max(50).nullable().optional(),
 });
 
 export const updateCourseSchema = createCourseSchema.partial();

@@ -320,20 +320,34 @@ export async function getComplianceRecords(
 
   const result = await db.findMany<any>("compliance_records", queryOptions);
 
-  // Enrich with user name and course title
+  // Enrich with user name and course title.
+  // Adapter camelizes: user_id → userId, course_id → courseId.
   const enriched = await Promise.all(
     result.data.map(async (record: any) => {
+      const uid = record.userId ?? record.user_id;
+      const cid = record.courseId ?? record.course_id;
+      const aid = record.assignmentId ?? record.assignment_id;
       const [user, course] = await Promise.all([
-        findUserById(record.user_id),
-        db.findById<any>("courses", record.course_id),
+        uid ? findUserById(uid).catch(() => null) : null,
+        cid ? db.findById<any>("courses", cid).catch(() => null) : null,
       ]);
       return {
         ...record,
+        user_id: uid,
+        course_id: cid,
+        assignment_id: aid,
+        due_date: record.dueDate ?? record.due_date,
         user_name: user
+          ? `${user.first_name} ${user.last_name}`
+          : "Unknown User",
+        userName: user
           ? `${user.first_name} ${user.last_name}`
           : "Unknown User",
         user_email: user?.email || null,
         course_title: course?.title || null,
+        courseName: course?.title || null,
+        compliance_type: course?.complianceType ?? course?.compliance_type ?? null,
+        complianceType: course?.complianceType ?? course?.compliance_type ?? null,
       };
     })
   );
@@ -350,28 +364,51 @@ export async function getComplianceRecords(
 export async function getUserComplianceRecords(
   orgId: number,
   userId: number,
-  filters?: { page?: number; limit?: number }
+  filters?: { page?: number; limit?: number; status?: string }
 ) {
   const db = getDB();
+
+  const queryFilters: Record<string, any> = { org_id: orgId, user_id: userId };
+  if (filters?.status) queryFilters.status = filters.status;
 
   const result = await db.findMany<any>("compliance_records", {
     page: filters?.page || 1,
     limit: filters?.limit || 20,
-    filters: { org_id: orgId, user_id: userId },
+    filters: queryFilters,
     sort: { field: "due_date", order: "asc" },
   });
 
-  // Enrich with course title and assignment name
+  // Enrich with course title and assignment name.
+  // Adapter camelizes: course_id → courseId, assignment_id → assignmentId.
   const enriched = await Promise.all(
     result.data.map(async (record: any) => {
+      const cid = record.courseId ?? record.course_id;
+      const aid = record.assignmentId ?? record.assignment_id;
       const [course, assignment] = await Promise.all([
-        db.findById<any>("courses", record.course_id),
-        db.findById<any>("compliance_assignments", record.assignment_id),
+        cid ? db.findById<any>("courses", cid) : null,
+        aid ? db.findById<any>("compliance_assignments", aid) : null,
       ]);
+      // Derive progress from status for the frontend progress bar
+      const progress =
+        record.status === "completed" ? 100
+        : record.status === "in_progress" ? 50
+        : 0;
+
       return {
         ...record,
+        course_id: cid,
+        assignment_id: aid,
+        // The page reads courseName (camelCase) and course_title (snake)
         course_title: course?.title || null,
-        assignment_name: assignment?.name || null,
+        courseName: course?.title || null,
+        assignment_name: assignment?.name || assignment?.title || null,
+        assignmentName: assignment?.name || assignment?.title || null,
+        assignment_description: assignment?.description || null,
+        due_date: record.dueDate ?? record.due_date,
+        completed_at: record.completedAt ?? record.completed_at,
+        compliance_type: course?.complianceType ?? course?.compliance_type ?? null,
+        complianceType: course?.complianceType ?? course?.compliance_type ?? null,
+        progress,
       };
     })
   );
@@ -482,9 +519,10 @@ export async function checkOverdue(orgId: number) {
 export async function getComplianceDashboard(orgId: number) {
   const db = getDB();
 
+  // MySQL stores boolean as tinyint(1), so pass 1 instead of true
   const totalAssignments = await db.count("compliance_assignments", {
     org_id: orgId,
-    is_active: true,
+    is_active: 1,
   });
 
   const totalRecords = await db.count("compliance_records", { org_id: orgId });
@@ -505,19 +543,26 @@ export async function getComplianceDashboard(orgId: number) {
     status: "not_started",
   });
 
-  // Department breakdown using empcloud DB + compliance records
-  const departmentBreakdown = await db.raw<any[]>(
-    `SELECT u.department_id,
-            COUNT(cr.id) as total,
-            SUM(CASE WHEN cr.status = 'completed' THEN 1 ELSE 0 END) as completed,
-            SUM(CASE WHEN cr.status = 'overdue' THEN 1 ELSE 0 END) as overdue
-     FROM compliance_records cr
-     LEFT JOIN (SELECT id, department_id FROM ${getEmpCloudDBName()}.users WHERE org_id = ?) u
-       ON u.id = cr.user_id
-     WHERE cr.org_id = ?
-     GROUP BY u.department_id`,
-    [orgId, orgId]
-  );
+  // Department breakdown using empcloud DB + compliance records.
+  // Wrapped in try-catch so a cross-DB permission issue doesn't crash
+  // the entire dashboard — the basic stats still show up.
+  let departmentBreakdown: any[] = [];
+  try {
+    departmentBreakdown = await db.raw<any[]>(
+      `SELECT u.department_id,
+              COUNT(cr.id) as total,
+              SUM(CASE WHEN cr.status = 'completed' THEN 1 ELSE 0 END) as completed,
+              SUM(CASE WHEN cr.status = 'overdue' THEN 1 ELSE 0 END) as overdue
+       FROM compliance_records cr
+       LEFT JOIN (SELECT id, department_id FROM ${getEmpCloudDBName()}.users WHERE org_id = ?) u
+         ON u.id = cr.user_id
+       WHERE cr.org_id = ?
+       GROUP BY u.department_id`,
+      [orgId, orgId]
+    );
+  } catch (err) {
+    logger.warn("Department breakdown query failed (cross-DB access issue?)", err);
+  }
 
   return {
     total_assignments: totalAssignments,
@@ -544,6 +589,111 @@ function getEmpCloudDBName(): string {
   } catch {
     return "empcloud";
   }
+}
+
+// ---------------------------------------------------------------------------
+// Policy Acceptance
+// ---------------------------------------------------------------------------
+
+export async function acceptPolicy(
+  orgId: number,
+  userId: number,
+  data: {
+    course_id: string;
+    enrollment_id?: string;
+    policy_version?: number;
+    ip_address?: string;
+    user_agent?: string;
+  }
+) {
+  const db = getDB();
+
+  if (!data.course_id) {
+    throw new BadRequestError("course_id is required");
+  }
+
+  // Validate course exists and is a policy-type compliance course
+  const course = await db.findOne<any>("courses", {
+    id: data.course_id,
+    org_id: orgId,
+  });
+  if (!course) {
+    throw new NotFoundError("Course", data.course_id);
+  }
+
+  const complianceType = course.complianceType ?? course.compliance_type;
+  const isCompliance = course.isCompliance ?? course.is_compliance;
+  if (!isCompliance || complianceType !== "policy") {
+    throw new BadRequestError("This course is not a policy-type compliance course");
+  }
+
+  // Check for existing acceptance of this version
+  const version = data.policy_version ?? 1;
+  const existing = await db.findOne<any>("policy_acceptances", {
+    org_id: orgId,
+    user_id: userId,
+    course_id: data.course_id,
+    policy_version: version,
+  });
+  if (existing) {
+    return existing; // Already accepted
+  }
+
+  const acceptanceId = uuidv4();
+  const now = new Date();
+  const acceptance = await db.create<any>("policy_acceptances", {
+    id: acceptanceId,
+    org_id: orgId,
+    user_id: userId,
+    course_id: data.course_id,
+    enrollment_id: data.enrollment_id || null,
+    policy_version: version,
+    accepted_at: now,
+    ip_address: data.ip_address || null,
+    user_agent: data.user_agent || null,
+  });
+
+  // If there's a compliance record for this user+course, mark it completed
+  const complianceRecord = await db.findOne<any>("compliance_records", {
+    org_id: orgId,
+    user_id: userId,
+    course_id: data.course_id,
+  });
+  if (complianceRecord) {
+    const recordId = complianceRecord.id ?? complianceRecord.id;
+    await db.update("compliance_records", recordId, {
+      status: "completed",
+      completed_at: now,
+    });
+
+    lmsEvents.emit("compliance.completed", {
+      complianceId: recordId,
+      courseId: data.course_id,
+      userId,
+      orgId,
+      completedAt: now,
+    });
+  }
+
+  logger.info(`Policy accepted: user=${userId}, course=${data.course_id}, version=${version}`);
+  return acceptance;
+}
+
+export async function getUserPolicyAcceptances(
+  orgId: number,
+  userId: number,
+  courseId?: string
+) {
+  const db = getDB();
+  const filters: Record<string, any> = { org_id: orgId, user_id: userId };
+  if (courseId) filters.course_id = courseId;
+
+  const result = await db.findMany<any>("policy_acceptances", {
+    filters,
+    sort: { field: "accepted_at", order: "desc" },
+    limit: 100,
+  });
+  return result.data;
 }
 
 export async function processRecurringAssignments(orgId: number) {

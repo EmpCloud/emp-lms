@@ -19,9 +19,9 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { useOverviewAnalytics } from "@/api/hooks";
-import { useMyEnrollments } from "@/api/hooks";
+import { useOverviewAnalytics, useMyEnrollments, useMyCertificates } from "@/api/hooks";
 import { formatDate } from "@/lib/utils";
+import { useAuthStore, isAdminRole } from "@/lib/auth-store";
 
 /* ── Skeleton ────────────────────────────────────────────────────────────── */
 function StatSkeleton() {
@@ -102,29 +102,68 @@ function QuickLink({
 
 /* ── Main Page ───────────────────────────────────────────────────────────── */
 export default function DashboardPage() {
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = isAdminRole(user?.role);
+
+  // Admin gets the full analytics endpoint; employees compute from their
+  // own enrollments (the analytics route is admin-only and 403s otherwise).
   const { data: analytics, isLoading: analyticsLoading } =
     useOverviewAnalytics();
-  const { data: enrollments, isLoading: enrollmentsLoading } =
-    useMyEnrollments({ limit: 5 });
+  const { data: allEnrollments, isLoading: enrollmentsLoading } =
+    useMyEnrollments({ limit: 100 });
+  const { data: certs } = useMyCertificates();
 
-  const isLoading = analyticsLoading || enrollmentsLoading;
-  // The server returns snake_case fields (total_courses, total_enrollments,
-  // completed_enrollments, total_certificates_issued, ...). Normalize to a
-  // single `stats` object so the cards below stay readable and either name
-  // shape works (in case the API ever switches to camelCase).
+  const isLoading = (isAdmin ? analyticsLoading : false) || enrollmentsLoading;
+
+  const myEnrollmentList: any[] = allEnrollments?.data ?? [];
+  const myCertsList: any[] = certs?.data ?? [];
+
+  // Recent enrollments — sorted by most recent activity
+  const recentEnrollments: any[] = [...myEnrollmentList]
+    .sort((a: any, b: any) => {
+      const da = a.updatedAt || a.updated_at || a.enrolledAt || a.enrolled_at || "";
+      const db2 = b.updatedAt || b.updated_at || b.enrolledAt || b.enrolled_at || "";
+      return db2 > da ? 1 : -1;
+    })
+    .slice(0, 5);
+
+  // For employees: derive stats from their own enrollments + certs.
   const raw = analytics?.data ?? {};
-  const stats = {
-    totalCourses: raw.total_courses ?? raw.totalCourses ?? 0,
-    myEnrollments: raw.total_enrollments ?? raw.myEnrollments ?? 0,
-    completed: raw.completed_enrollments ?? raw.completed ?? 0,
-    certificatesEarned: raw.total_certificates_issued ?? raw.certificatesEarned ?? 0,
-    currentStreak: raw.current_streak ?? raw.currentStreak ?? 0,
-    completionByMonth: raw.completion_by_month ?? raw.completionByMonth ?? [],
-  };
-  const recentEnrollments = enrollments?.data ?? [];
+  const completedEnrollments = myEnrollmentList.filter(
+    (e: any) => e.status === "completed",
+  );
+  const stats = isAdmin
+    ? {
+        totalCourses: raw.total_courses ?? raw.totalCourses ?? 0,
+        myEnrollments: raw.total_enrollments ?? raw.myEnrollments ?? 0,
+        completed: raw.completed_enrollments ?? raw.completed ?? 0,
+        certificatesEarned:
+          raw.total_certificates_issued ?? raw.certificatesEarned ?? 0,
+        currentStreak: raw.current_streak ?? raw.currentStreak ?? 0,
+        completionByMonth: raw.completion_by_month ?? raw.completionByMonth ?? [],
+      }
+    : {
+        totalCourses: myEnrollmentList.length,
+        myEnrollments: myEnrollmentList.length,
+        completed: completedEnrollments.length,
+        certificatesEarned: myCertsList.length,
+        currentStreak: 0,
+        completionByMonth: [] as any[],
+      };
 
-  /* Build simple chart data from analytics */
-  const chartData: { name: string; completion: number }[] = stats.completionByMonth ?? [];
+  // Build chart data — for employees, show per-course progress as a bar chart
+  // since we don't have monthly aggregation without the analytics endpoint.
+  const chartData: { name: string; completion: number }[] =
+    stats.completionByMonth.length > 0
+      ? stats.completionByMonth
+      : myEnrollmentList.slice(0, 8).map((e: any) => ({
+          name:
+            (e.course_title ?? e.courseTitle ?? e.course?.title ?? "Course")
+              .split(" ")
+              .slice(0, 3)
+              .join(" "),
+          completion: Number(e.progress_percentage ?? e.progressPercentage ?? e.progress ?? 0),
+        }));
 
   /* ── Loading state ─────────────────────────────────────────────────── */
   if (isLoading) {
@@ -245,12 +284,12 @@ export default function DashboardPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-gray-800">
-                      {enrollment.courseTitle ?? enrollment.course?.title ?? "Course"}
+                      {enrollment.courseTitle ?? enrollment.course?.title ?? enrollment.courseName ?? enrollment.course_title ?? "Course"}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {enrollment.progress ?? 0}% complete
-                      {enrollment.updatedAt &&
-                        ` \u00b7 ${formatDate(enrollment.updatedAt)}`}
+                      {Number(enrollment.progressPercentage ?? enrollment.progress_percentage ?? enrollment.progress ?? 0)}% complete
+                      {(enrollment.updatedAt || enrollment.updated_at) &&
+                        ` \u00b7 ${formatDate(enrollment.updatedAt || enrollment.updated_at)}`}
                     </p>
                   </div>
                 </li>
