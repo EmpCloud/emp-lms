@@ -2,10 +2,51 @@
 // KNEX SQL ADAPTER — supports MySQL, PostgreSQL, SQLite
 // ============================================================================
 
+import { promises as fs } from "fs";
+import * as path from "path";
 import knex from "knex";
 import type { Knex } from "knex";
 import { v4 as uuidv4 } from "uuid";
 import { IDBAdapter, QueryOptions, QueryResult, TransactionContext } from "./interface";
+
+/**
+ * Realign `knex_migrations.name` rows so their extension matches what's on disk.
+ * Without this, switching between tsx (.ts) and compiled node (.js) — or vice
+ * versa — makes knex.migrate.latest() abort with "directory is corrupt".
+ *
+ * Idempotent. Safe on a fresh DB (no-op if knex_migrations table doesn't exist).
+ */
+async function normalizeMigrationExtensions(db: Knex, dir: string): Promise<void> {
+  const exists = await db.schema.hasTable("knex_migrations");
+  if (!exists) return;
+  let files: string[];
+  try {
+    files = await fs.readdir(dir);
+  } catch {
+    return; // directory not present in this runner; nothing to align
+  }
+  const onDisk = new Set(files);
+  const byBase = new Map<string, string>();
+  for (const f of files) byBase.set(f.replace(/\.[jt]s$/, ""), f);
+
+  const records: { id: number; name: string }[] = await db("knex_migrations").select(
+    "id",
+    "name",
+  );
+  let renamed = 0;
+  for (const r of records) {
+    if (onDisk.has(r.name)) continue;
+    const match = byBase.get(r.name.replace(/\.[jt]s$/, ""));
+    if (match) {
+      await db("knex_migrations").where({ id: r.id }).update({ name: match });
+      renamed++;
+    }
+  }
+  if (renamed) {
+    // eslint-disable-next-line no-console
+    console.log(`[knex-adapter] realigned ${renamed} knex_migrations record(s) to disk`);
+  }
+}
 
 // Singleton instance for raw Knex access
 let knexInstance: Knex | null = null;
@@ -126,7 +167,15 @@ export class KnexAdapter implements IDBAdapter {
 
   // Migrations
   async migrate(): Promise<void> {
-    await this.getDb().migrate.latest();
+    const db = this.getDb();
+    const migrationsCfg = (this.knexConfig.migrations || {}) as { directory?: string };
+    if (migrationsCfg.directory) {
+      const dir = path.isAbsolute(migrationsCfg.directory)
+        ? migrationsCfg.directory
+        : path.resolve(process.cwd(), migrationsCfg.directory);
+      await normalizeMigrationExtensions(db, dir);
+    }
+    await db.migrate.latest();
   }
 
   async rollback(): Promise<void> {
